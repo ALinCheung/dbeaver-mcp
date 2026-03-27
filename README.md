@@ -27,25 +27,25 @@ claude mcp add dbeaver-mcp -- npx dbeaver-mcp
 
 **macOS:**
 ```bash
-git clone https://github.com/lucascborges/dbeaver-mcp.git ~/.dbeaver-mcp
-cd ~/.dbeaver-mcp && ./install/mac.sh
+git clone https://github.com/lucascborges/dbeaver-mcp.git /tmp/dbeaver-mcp
+cd /tmp/dbeaver-mcp && ./install/mac.sh
 ```
 
 **Linux:**
 ```bash
-git clone https://github.com/lucascborges/dbeaver-mcp.git ~/.dbeaver-mcp
-cd ~/.dbeaver-mcp && ./install/linux.sh
+git clone https://github.com/lucascborges/dbeaver-mcp.git /tmp/dbeaver-mcp
+cd /tmp/dbeaver-mcp && ./install/linux.sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/lucascborges/dbeaver-mcp.git $env:USERPROFILE\.dbeaver-mcp
-cd $env:USERPROFILE\.dbeaver-mcp; .\install\windows.ps1
+git clone https://github.com/lucascborges/dbeaver-mcp.git $env:TEMP\dbeaver-mcp
+cd $env:TEMP\dbeaver-mcp; .\install\windows.ps1
 ```
 
 The install script will:
 - Check for Node.js and install npm dependencies
-- Build the TypeScript source
+- Copy the project to `~/.skills/dbeaver-mcp` and build
 - Verify your DBeaver workspace exists
 - Register the server with your OS service manager (launchd / systemd)
 - Register the MCP server with Claude Code (if installed)
