@@ -24,3 +24,6 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# OMC state
+.omc/
