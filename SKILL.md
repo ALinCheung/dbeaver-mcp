@@ -1,17 +1,18 @@
 ---
 name: dbeaver-mcp
 description: |
-  Conecta ao MySQL via credenciais do DBeaver, executa queries, gerencia conexões DBeaver
-  (listar, adicionar, editar, remover), e aplica boas práticas de schema, indexação, otimização
-  de queries e operações MySQL/InnoDB. Use SEMPRE que o usuário mencionar banco de dados,
-  MySQL, queries SQL, conexão DBeaver, schema, tabelas, índices, performance, deadlocks,
-  migrações, ou pedir para rodar/consultar/analisar dados. Também use quando o usuário
-  disser "conecta no banco", "roda essa query", "mostra as tabelas", "adiciona conexão no DBeaver".
+  Conecta ao MySQL, PostgreSQL e Oracle via credenciais do DBeaver, executa queries,
+  gerencia conexões DBeaver (listar, adicionar, editar, remover), e aplica boas práticas
+  de schema, indexação, otimização de queries e operações de banco de dados. Use SEMPRE
+  que o usuário mencionar banco de dados, MySQL, PostgreSQL, Oracle, queries SQL,
+  conexão DBeaver, schema, tabelas, índices, performance, deadlocks, migrações, ou
+  pedir para rodar/consultar/analisar dados. Também use quando o usuário disser
+  "conecta no banco", "roda essa query", "mostra as tabelas", "adiciona conexão no DBeaver".
 ---
 
-# DBeaver MCP — MySQL + DBeaver Connection Manager
+# DBeaver MCP — MySQL + PostgreSQL + Oracle + DBeaver Connection Manager
 
-Skill completa para operar MySQL via credenciais DBeaver com boas práticas de banco de dados.
+Skill completa para operar MySQL, PostgreSQL e Oracle via credenciais DBeaver com boas práticas de banco de dados.
 
 ## Arquitetura
 
@@ -21,7 +22,9 @@ Claude (skill)
 dbeaver-mcp server (Node.js)
     ├── Lê credenciais do DBeaver (em memória, nunca em disco)
     ├── Gerencia data-sources.json (adicionar/editar/remover conexões)
-    └── Executa queries MySQL via mysql2
+    ├── Executa queries MySQL via mysql2
+    ├── Executa queries PostgreSQL via pg
+    └── Executa queries Oracle via oracledb
 ```
 
 ## Início rápido
@@ -55,8 +58,28 @@ dbeaver-mcp server (Node.js)
 | `list_tables` | Lista tabelas de um banco |
 | `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
 | `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
-| `show_processlist` | Mostra queries em execução no servidor |
-| `show_slow_queries` | Lista queries lentas do performance_schema |
+| `show_processlist` | Mostra queries em execução no servidor (MySQL) |
+| `show_slow_queries` | Lista queries lentas do performance_schema (MySQL) |
+
+### PostgreSQL
+
+| Tool | Descrição |
+|---|---|
+| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
+| `run_write` | Executa INSERT, UPDATE, DELETE, DDL (pede confirmação) |
+| `list_tables` | Lista tabelas de um banco (usa information_schema) |
+| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
+| `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
+
+### Oracle
+
+| Tool | Descrição |
+|---|---|
+| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
+| `run_write` | Executa INSERT, UPDATE, DELETE, MERGE, DDL (pede confirmação) |
+| `list_tables` | Lista tabelas de um banco (usa all_tables/dba_tables) |
+| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
+| `explain_query` | Roda EXPLAIN PLAN e interpreta o plano de execução |
 
 ---
 
@@ -110,6 +133,68 @@ dbeaver-mcp server (Node.js)
 
 ---
 
+## PostgreSQL — Boas Práticas
+
+### Schema Design
+- PKs: `BIGSERIAL` ou `GENERATED ALWAYS AS IDENTITY` para OLTP. Evite UUID aleatório como PK se não for necessário.
+- Sempre `utf88` / `en_US.UTF-8`. Prefira `NOT NULL`, `TIMESTAMP WITH TIME ZONE` sobre `TIMESTAMP`.
+- Lookup tables em vez de `ENUM`. Normalize para 3NF; desnormalize apenas em hot paths medidos.
+
+### Indexação
+- Índices compostos: ordem importa — igualdade primeiro, depois range/sort.
+- Predicados de range param o uso do índice para colunas subsequentes.
+- Use `INCLUDE` em índices para cobrir queries sem hit adicional na tabela.
+- Monitore uso de índices via `pg_stat_user_indexes`.
+
+### Otimização de Queries
+- Cheque `EXPLAIN (ANALYZE, BUFFERS)` — red flags: Seq Scan, Hash Join com grandes rows, Sort com grande custo.
+- Paginação por cursor (`WHERE id > last_id`) ou `KEYSETpagination`, não `OFFSET`.
+- Evite funções em colunas indexadas no `WHERE` — usa índices expression se necessário.
+- Batch inserts via `COPY` para grandes volumes.
+
+### Transactions & Locking
+- Default: `READ COMMITTED`. Use `REPEATABLE READ` para maior consistência.
+- Acesso consistente a linhas previne deadlocks. Retry em erro 40001 com backoff.
+- Keep transactions curtas — evite long transactions que causam bloat de MVCC.
+
+### Operações
+- Use `CREATE INDEX CONCURRENTLY` para índices em produção — não bloqueia writes.
+- Monitore `pg_stat_activity` para queries lentas e locks.
+- VACUUM e ANALYZE são essenciais — autovacuum cobre a maioria dos casos.
+
+---
+
+## Oracle — Boas Práticas
+
+### Schema Design
+- PKs: `NUMBER GENERATED ALWAYS AS IDENTITY` para OLTP.
+- Prefira `NOT NULL`, `TIMESTAMP` ou `DATE` conforme necessidade.
+- Lookup tables em vez de `ENUM`. Normalize para 3NF; desnormalize apenas em hot paths medidos.
+
+### Indexação
+- Ordem em índice composto: igualdade primeiro, depois range/sort.
+- Predicados de range param o uso do índice para colunas subsequentes.
+- Use índices funcionais para colunas calculadas.
+- Monitore uso de índices via `USER_INDEXES` / `DBA_INDEXES`.
+
+### Otimização de Queries
+- Cheque `EXPLAIN PLAN` — red flags: FULL TABLE SCAN, SORT, HASH JOIN com grandes datasets.
+- Paginação via `ROWNUM` ou `FETCH FIRST N ROWS ONLY` (Oracle 12c+).
+- Evite funções em colunas indexadas no `WHERE`.
+- Use binds variables para queries repetidas.
+
+### Transactions & Locking
+- Default: `READ COMMITTED`. Use `SERIALIZABLE` para maior consistência (com cuidado).
+- Deadlocks podem ocorrer — implemente retry logic com backoff exponencial.
+- Minimize o tempo de hold de locks — não faça interação do usuário dentro de transactions.
+
+### Operações
+- Use `DBMS_SCHEDULER` para jobs agendados.
+- Monitore `V$SESSION` e `V$SQL` para performance.
+- partitioning é poderoso para grandes tabelas — use `RANGE` ou `LIST` partitioning.
+
+---
+
 ## Referências detalhadas
 
 Leia os arquivos abaixo conforme necessário (não carregue todos de uma vez):
@@ -146,6 +231,20 @@ Leia os arquivos abaixo conforme necessário (não carregue todos de uma vez):
 - `references/dbeaver/credentials.md` — como o DBeaver armazena credenciais por OS
 - `references/dbeaver/datasources.md` — estrutura do data-sources.json, campos importantes
 - `references/dbeaver/workspace.md` — caminhos do workspace por OS, versões DBeaver
+
+**PostgreSQL:**
+- `references/postgres/primary-keys.md` — design de PKs, serial, identity, uuid
+- `references/postgres/indexing.md` — tipos de índices, composite indexes, include columns
+- `references/postgres/explain-analysis.md` — leitura de EXPLAIN, red flags
+- `references/postgres/transactions.md` — isolation levels, locking, MVCC, deadlocks
+- `references/postgres/partitioning.md` — RANGE, LIST, HASH partitioning
+
+**Oracle:**
+- `references/oracle/primary-keys.md` — design de PKs, identity, sequences
+- `references/oracle/indexing.md` — tipos de índices, bitmap, function-based indexes
+- `references/oracle/explain-plan.md` — leitura de EXPLAIN PLAN, red flags
+- `references/oracle/transactions.md` — isolation levels, locking, deadlocks
+- `references/oracle/partitioning.md` — RANGE, LIST, HASH, INTERVAL partitioning
 
 ---
 
