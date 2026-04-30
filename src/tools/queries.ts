@@ -6,7 +6,9 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
 import { extractSqlKeyword, checkPermission } from "../permissions.js";
-import { runQuery, runWrite } from "../mysql.js";
+import { runQuery as runMysqlQuery, runWrite as runMysqlWrite } from "../mysql.js";
+import { runPostgresQuery, runPostgresWrite, isPostgresWriteOperation } from "../postgres.js";
+import { runOracleQuery, runOracleWrite, isOracleWriteOperation } from "../oracle.js";
 
 const WRITE_KEYWORDS = new Set([
   "INSERT", "UPDATE", "DELETE", "DROP", "TRUNCATE", "ALTER", "CREATE",
@@ -14,6 +16,64 @@ const WRITE_KEYWORDS = new Set([
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+/**
+ * 根据 driver 类型判断是否为写操作
+ */
+function isWriteOperation(driver: string, query: string): boolean {
+  const d = driver.toLowerCase();
+  if (d === "postgres" || d === "postgresql" || d === "postgres-jdbc") {
+    return isPostgresWriteOperation(query);
+  }
+  if (d === "oracle") {
+    return isOracleWriteOperation(query);
+  }
+  // MySQL 默认行为
+  const keyword = extractSqlKeyword(query);
+  return WRITE_KEYWORDS.has(keyword);
+}
+
+/**
+ * 根据 driver 类型执行查询
+ */
+async function executeQuery(
+  info: dbeaver.FullConnectionInfo,
+  sql: string
+): Promise<any> {
+  const driver = (info.driver || "").toLowerCase();
+
+  if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
+    return await runPostgresQuery(info, sql);
+  }
+
+  if (driver === "oracle") {
+    return await runOracleQuery(info, sql);
+  }
+
+  // 默认 MySQL
+  return await runMysqlQuery(info, sql);
+}
+
+/**
+ * 根据 driver 类型执行写操作
+ */
+async function executeWrite(
+  info: dbeaver.FullConnectionInfo,
+  sql: string
+): Promise<any> {
+  const driver = (info.driver || "").toLowerCase();
+
+  if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
+    return await runPostgresWrite(info, sql);
+  }
+
+  if (driver === "oracle") {
+    return await runOracleWrite(info, sql);
+  }
+
+  // 默认 MySQL
+  return await runMysqlWrite(info, sql);
 }
 
 export function registerQueryTools(server: McpServer): void {
@@ -27,15 +87,17 @@ export function registerQueryTools(server: McpServer): void {
     async ({ connection, sql }) => {
       try {
         const trimmed = sql.trim();
-        const keyword = extractSqlKeyword(trimmed);
-        if (WRITE_KEYWORDS.has(keyword)) {
-          return text({ error: `Use run_write para operações de escrita (${keyword}). run_query é somente leitura.` });
-        }
         const permError = checkPermission(connection, trimmed);
         if (permError) return text({ error: permError });
+
         const info = dbeaver.getConnectionInfo(connection);
         if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
-        const result = await runQuery(info, trimmed);
+
+        if (isWriteOperation(info.driver, trimmed)) {
+          return text({ error: `Use run_write para operações de escrita. run_query é somente leitura.` });
+        }
+
+        const result = await executeQuery(info, trimmed);
         return text(result);
       } catch (e: any) {
         return text({ error: e.message });
@@ -56,6 +118,7 @@ export function registerQueryTools(server: McpServer): void {
         const trimmed = sql.trim();
         const permError = checkPermission(connection, trimmed);
         if (permError) return text({ error: permError });
+
         if (!confirmed) {
           return text({
             requires_confirmation: true,
@@ -63,9 +126,11 @@ export function registerQueryTools(server: McpServer): void {
             sql_preview: trimmed.slice(0, 300),
           });
         }
+
         const info = dbeaver.getConnectionInfo(connection);
         if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
-        const result = await runWrite(info, trimmed);
+
+        const result = await executeWrite(info, trimmed);
         return text(result);
       } catch (e: any) {
         return text({ error: e.message });

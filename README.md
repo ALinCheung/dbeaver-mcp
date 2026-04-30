@@ -4,7 +4,7 @@ MCP server that exposes your DBeaver connections to Claude as tools. Decrypts cr
 
 **[Leia em Português](README.pt-br.md)**
 
-Use your existing DBeaver database connections directly from Claude Code or Claude Desktop to query, manage, and analyze MySQL databases without re-entering credentials.
+Use your existing DBeaver database connections directly from Claude Code or Claude Desktop to query, manage, and analyze MySQL, PostgreSQL, and Oracle databases without re-entering credentials.
 
 ## How It Works
 
@@ -20,15 +20,16 @@ Use your existing DBeaver database connections directly from Claude Code or Clau
 │                                             │
 │  1. Reads DBeaver's config files from disk  │
 │  2. Decrypts credentials in memory only     │
-│  3. Opens a direct MySQL connection         │
+│  3. Opens a direct database connection       │
+│     (MySQL/mysql2, PostgreSQL/pg, Oracle/oracledb) │
 │  4. Returns query results to Claude         │
 │  5. Closes connection — nothing persisted   │
 └──────┬──────────────────────────┬───────────┘
        │                          │
        ▼                          ▼
-  DBeaver workspace         MySQL server
-  (data-sources.json,       (your database)
-   credentials-config.json)
+  DBeaver workspace         Database server
+  (data-sources.json,       (MySQL, PostgreSQL,
+   credentials-config.json)   or Oracle)
 ```
 
 ### Step by step
@@ -39,7 +40,7 @@ Use your existing DBeaver database connections directly from Claude Code or Clau
 
 3. **Credentials are decrypted in memory.** DBeaver 21+ encrypts `credentials-config.json` with AES-128-CBC (file-level encryption). dbeaver-mcp reads the binary file, extracts the IV (first 16 bytes), decrypts the rest with DBeaver's built-in key, and parses the JSON. The decrypted password exists only as a variable in memory — never written to disk, logs, or stdout.
 
-4. **A direct MySQL connection is opened** using `mysql2` with the decrypted credentials. The connection has a 10-second timeout and is used for a single operation.
+4. **A direct database connection is opened** using `mysql2`, `pg`, or `oracledb` depending on the driver type. The connection is used for a single operation.
 
 5. **The query executes and results are returned** as JSON through MCP stdout. Only the query results flow back to Claude — never the password or connection credentials.
 
@@ -147,6 +148,50 @@ claude mcp add dbeaver-mcp -- node ~/.skills/dbeaver-mcp/dist/index.js
 }
 ```
 
+### Option 4: 打包后注册（本地构建）
+
+如果你已经克隆项目并构建了打包文件，可以使用以下方法注册 MCP：
+
+**构建项目：**
+```bash
+git clone https://github.com/lucascborges/dbeaver-mcp.git
+cd dbeaver-mcp
+npm install
+npm run build
+```
+
+**Claude Code 注册：**
+```bash
+claude mcp add dbeaver-mcp -- node /path/to/dbeaver-mcp/dist/index.js
+```
+
+全局注册（所有项目可用）：
+```bash
+claude mcp add dbeaver-mcp --scope user -- node /path/to/dbeaver-mcp/dist/index.js
+```
+
+**OpenCode 注册：**
+
+在 OpenCode 的 MCP 配置中添加：
+
+```json
+{
+  "mcpServers": {
+    "dbeaver-mcp": {
+      "command": "node",
+      "args": ["/path/to/dbeaver-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+或者通过命令行注册：
+```bash
+opencode mcp add dbeaver-mcp -- node /path/to/dbeaver-mcp/dist/index.js
+```
+
+**注意：** 请将 `/path/to/dbeaver-mcp/` 替换为你的实际项目路径。
+
 ## Available Tools
 
 ### Connection Management
@@ -155,10 +200,10 @@ claude mcp add dbeaver-mcp -- node ~/.skills/dbeaver-mcp/dist/index.js
 |---|---|
 | `list_connections` | List all DBeaver connections (no passwords exposed) |
 | `get_connection` | Get connection details by name (no password exposed) |
-| `add_connection` | Add a new connection |
+| `add_connection` | Add a new connection (supports mysql, postgres, oracle drivers) |
 | `edit_connection` | Edit host, port, or database |
 | `remove_connection` | Remove a connection |
-| `test_connection` | Test connectivity and return MySQL version |
+| `test_connection` | Test connectivity and return database version |
 
 ### Query Execution
 
@@ -171,16 +216,16 @@ claude mcp add dbeaver-mcp -- node ~/.skills/dbeaver-mcp/dist/index.js
 
 | Tool | Description |
 |---|---|
-| `list_tables` | List tables in a database |
-| `describe_table` | Show columns, indexes, and CREATE TABLE statement |
+| `list_tables` | List tables in a database (uses database-specific metadata queries) |
+| `describe_table` | Show columns, indexes, and table structure |
 
 ### Performance & Monitoring
 
 | Tool | Description |
 |---|---|
 | `explain_query` | Run EXPLAIN and flag red flags (full scans, filesort, temp tables) |
-| `show_processlist` | Show currently running queries |
-| `show_slow_queries` | List slow queries from performance_schema |
+| `show_processlist` | Show currently running queries (uses database-specific queries) |
+| `show_slow_queries` | List slow queries (uses database-specific performance views) |
 
 ## Permissions
 
@@ -248,6 +293,8 @@ dbeaver-mcp/
 │   ├── dbeaver.ts          # Core: read/write DBeaver configs, AES-128-CBC crypto
 │   ├── permissions.ts      # Permission system (global + per-connection)
 │   ├── mysql.ts            # MySQL connection and query execution (mysql2)
+│   ├── postgres.ts         # PostgreSQL connection and query execution (pg)
+│   ├── oracle.ts           # Oracle connection and query execution (oracledb)
 │   ├── commands/
 │   │   └── install.ts      # Built-in installer (verify DBeaver, create config, register in Claude)
 │   └── tools/
@@ -257,7 +304,9 @@ dbeaver-mcp/
 ├── dist/                   # Compiled JS (generated by tsc)
 ├── references/
 │   ├── dbeaver/            # DBeaver internals (credentials, datasources, workspace)
-│   └── mysql/              # 15 MySQL reference guides
+│   ├── mysql/              # MySQL reference guides
+│   ├── postgres/           # PostgreSQL reference guides
+│   └── oracle/             # Oracle reference guides
 ├── package.json            # NPX-ready with bin field
 ├── tsconfig.json           # TypeScript config (ES2022, strict)
 ├── settings.example.json   # Example permissions config
@@ -270,7 +319,7 @@ dbeaver-mcp/
 
 - **Node.js 18+**
 - **DBeaver** installed with at least one saved connection
-- **MySQL** database accessible from your machine
+- **MySQL**, **PostgreSQL**, or **Oracle** database accessible from your machine
 
 ### Dependencies
 
@@ -278,6 +327,8 @@ dbeaver-mcp/
 |---|---|
 | `@modelcontextprotocol/sdk` | MCP server framework (stdio transport) |
 | `mysql2` | MySQL database driver (async/await) |
+| `pg` | PostgreSQL database driver |
+| `oracledb` | Oracle database driver |
 | `zod` | Input schema validation for tool arguments |
 
 ## License

@@ -6,10 +6,42 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
 import { checkPermission } from "../permissions.js";
-import { runQuery } from "../mysql.js";
+import { runQuery as runMysqlQuery } from "../mysql.js";
+import { runPostgresQuery } from "../postgres.js";
+import { runOracleQuery } from "../oracle.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+/**
+ * 根据 driver 类型执行测试查询
+ */
+async function testConnectionByDriver(
+  info: dbeaver.FullConnectionInfo
+): Promise<{ success: boolean; version?: string; error?: string }> {
+  const driver = (info.driver || "").toLowerCase();
+
+  try {
+    let version = "";
+    let result;
+
+    if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
+      result = await runPostgresQuery(info, "SELECT 1 AS ok, version() AS version");
+      version = result.rows[0]?.version || "";
+    } else if (driver === "oracle") {
+      result = await runOracleQuery(info, "SELECT 1 AS ok FROM DUAL");
+      version = "Oracle";
+    } else {
+      // MySQL 默认行为
+      result = await runMysqlQuery(info, "SELECT 1 AS ok, VERSION() AS version");
+      version = result.rows[0]?.version || "";
+    }
+
+    return { success: true, version };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 }
 
 export function registerConnectionTools(server: McpServer): void {
@@ -109,9 +141,13 @@ export function registerConnectionTools(server: McpServer): void {
         if (!info) return text({ success: false, error: `Conexão '${name}' não encontrada.` });
         const permError = checkPermission(name, "SELECT 1");
         if (permError) return text({ success: false, error: permError });
-        const result = await runQuery(info, "SELECT 1 AS ok, VERSION() AS version");
-        const row = result.rows[0] || {};
-        return text({ success: true, version: row.version || "", name });
+
+        const testResult = await testConnectionByDriver(info);
+        if (testResult.success) {
+          return text({ success: true, version: testResult.version, name });
+        } else {
+          return text({ success: false, error: testResult.error });
+        }
       } catch (e: any) {
         return text({ success: false, error: e.message });
       }

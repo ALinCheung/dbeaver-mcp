@@ -11,13 +11,15 @@ dbeaver-mcp/
 │   ├── dbeaver.ts          # Core: ler configs DBeaver, crypto AES-128-CBC, CRUD conexões
 │   ├── permissions.ts      # Carregar settings.json, check de permissão por conexão
 │   ├── mysql.ts            # Wrappers de conexão e execução de queries (mysql2)
+│   ├── postgres.ts         # Wrappers de conexão e execução de queries (pg)
+│   ├── oracle.ts           # Wrappers de conexão e execução de queries (oracledb)
 │   └── tools/
 │       ├── connections.ts  # Tools: list, get, add, edit, remove, test connection
 │       ├── queries.ts      # Tools: run_query, run_write
 │       └── schema.ts       # Tools: list_tables, describe_table, explain, processlist, slow queries
 ├── dist/                   # JS compilado (gitignored)
 ├── install/                # Scripts de instalação por OS
-├── references/             # Docs de referência DBeaver + MySQL
+├── references/             # Docs de referência DBeaver + MySQL + PostgreSQL + Oracle
 ├── package.json            # NPX-ready com bin field
 ├── tsconfig.json           # TypeScript config
 └── settings.example.json   # Exemplo de permissões
@@ -42,6 +44,14 @@ node dist/index.js
 ```
 
 O servidor usa protocolo MCP via stdio (JSON-RPC 2.0).
+
+## Bancos de dados suportados
+
+| Driver | Banco | Pacote |
+|--------|-------|--------|
+| `mysql8` | MySQL | mysql2 |
+| `postgres` / `postgresql` | PostgreSQL | pg |
+| `oracle` | Oracle | oracledb |
 
 ## Registrar no Claude Code
 
@@ -68,7 +78,7 @@ claude mcp add dbeaver-mcp -- npx dbeaver-mcp
 |---|---|
 | `list_connections` | Lista conexões DBeaver (sem senhas) |
 | `get_connection` | Retorna detalhes de uma conexão pelo nome |
-| `add_connection` | Adiciona nova conexão (configure credenciais no DBeaver) |
+| `add_connection` | Adiciona nova conexão (suporta mysql8, postgres, oracle) |
 | `edit_connection` | Edita host/porta/banco (credenciais via DBeaver) |
 | `remove_connection` | Remove uma conexão |
 | `test_connection` | Testa conectividade |
@@ -78,7 +88,7 @@ claude mcp add dbeaver-mcp -- npx dbeaver-mcp
 | `describe_table` | Estrutura, índices e CREATE TABLE |
 | `explain_query` | EXPLAIN com análise de red flags |
 | `show_processlist` | Queries em execução |
-| `show_slow_queries` | Queries lentas do performance_schema |
+| `show_slow_queries` | Queries lentas (usa views específicas do banco) |
 
 ## Permissões
 
@@ -96,8 +106,9 @@ Veja `settings.example.json` para exemplo de configuração.
 - Senhas descriptografadas em memória, nunca logadas
 - `credentials-config.json` e `data-sources.json` estão no `.gitignore`
 - `run_write` exige `confirmed: true` antes de executar
-- `run_query` bloqueia INSERT/UPDATE/DELETE/DROP
+- `run_query` bloqueia INSERT/UPDATE/DELETE/DROP (para todos os bancos)
 - Permissões configuráveis por conexão via `~/.dbeaver-mcp/settings.json`
+- Oracle: detecta MERGE, PL/SQL blocks como operações de escrita
 
 ## Caminhos do workspace DBeaver por OS
 

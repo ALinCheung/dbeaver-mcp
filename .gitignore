@@ -27,3 +27,7 @@ desktop.ini
 
 # OMC state
 .omc/
+
+# claude
+.claude
+openspec
