@@ -9,6 +9,7 @@ import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
 import { runPostgresQuery } from "../postgres.js";
 import { runOracleQuery } from "../oracle.js";
+import { getRedisSchema, RedisConnectionInfo } from "../redis.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -72,6 +73,19 @@ export function registerSchemaTools(server: McpServer): void {
           );
           const tables = result.rows.map((r: any) => r.table_name?.toLowerCase() || r.TABLE_NAME?.toLowerCase());
           return text({ database: db, tables, total: tables.length });
+        }
+
+        if (driver === "redis") {
+          // Redis: 返回键类型统计作为"表"
+          const schema = await getRedisSchema(info as RedisConnectionInfo);
+          const tables = ["_overview", ...schema.keys_by_type.map((t) => `keys_${t.type}`)];
+          return text({
+            database: "redis",
+            overview: schema.overview,
+            keys_by_type: schema.keys_by_type,
+            tables,
+            total: tables.length,
+          });
         }
 
         // MySQL 默认行为
@@ -166,6 +180,47 @@ export function registerSchemaTools(server: McpServer): void {
           });
         }
 
+        if (driver === "redis") {
+          // Redis: 获取键信息
+          const { runRedisQuery } = await import("../redis.js");
+          const keyTypeResult = await runRedisQuery(info as RedisConnectionInfo, `TYPE ${table}`);
+          const keyType = keyTypeResult.rows[0]?.type || "none";
+
+          if (keyType === "none") {
+            return text({ error: `Key '${table}' not found` });
+          }
+
+          const ttlResult = await runRedisQuery(info as RedisConnectionInfo, `TTL ${table}`);
+          const ttl = ttlResult.rows[0]?.ttl ?? -1;
+
+          if (keyType === "string") {
+            const valueResult = await runRedisQuery(info as RedisConnectionInfo, `GET ${table}`);
+            return text({ key: table, type: keyType, ttl, value: valueResult.rows[0]?.result || null });
+          }
+
+          if (keyType === "list") {
+            const lenResult = await runRedisQuery(info as RedisConnectionInfo, `LLEN ${table}`);
+            return text({ key: table, type: keyType, ttl, length: lenResult.rows[0]?.length || 0 });
+          }
+
+          if (keyType === "hash") {
+            const lenResult = await runRedisQuery(info as RedisConnectionInfo, `HLEN ${table}`);
+            return text({ key: table, type: keyType, ttl, field_count: lenResult.rows[0]?.hlen || 0 });
+          }
+
+          if (keyType === "set") {
+            const cardResult = await runRedisQuery(info as RedisConnectionInfo, `SCARD ${table}`);
+            return text({ key: table, type: keyType, ttl, cardinality: cardResult.rows[0]?.cardinality || 0 });
+          }
+
+          if (keyType === "zset") {
+            const cardResult = await runRedisQuery(info as RedisConnectionInfo, `ZCARD ${table}`);
+            return text({ key: table, type: keyType, ttl, cardinality: cardResult.rows[0]?.cardinality || 0 });
+          }
+
+          return text({ key: table, type: keyType, ttl });
+        }
+
         // MySQL 默认行为
         const columns = await runMysqlQuery(info, `DESCRIBE \`${db}\`.\`${table}\``);
         const indexes = await runMysqlQuery(info, `SHOW INDEX FROM \`${db}\`.\`${table}\``);
@@ -199,6 +254,9 @@ export function registerSchemaTools(server: McpServer): void {
           explainSql = `EXPLAIN ${sql.trim()}`;
         } else if (driver === "oracle") {
           explainSql = `EXPLAIN PLAN SET STATEMENT_ID = 'MCP' FOR ${sql.trim()}`;
+        } else if (driver === "redis") {
+          // Redis doesn't support EXPLAIN, return a message
+          return text({ error: "Redis does not support EXPLAIN. Use SLOWLOG to monitor slow commands." });
         } else {
           explainSql = `EXPLAIN ${sql.trim()}`;
         }
@@ -269,6 +327,13 @@ export function registerSchemaTools(server: McpServer): void {
           return text(result);
         }
 
+        if (driver === "redis") {
+          // Redis: use CLIENT LIST for connection info
+          const { runRedisQuery } = await import("../redis.js");
+          const result = await runRedisQuery(info as RedisConnectionInfo, "CLIENT LIST");
+          return text({ client_list: result.rows });
+        }
+
         // MySQL 默认行为
         const result = await runMysqlQuery(info, "SHOW FULL PROCESSLIST");
         return text(result);
@@ -313,6 +378,13 @@ export function registerSchemaTools(server: McpServer): void {
              FETCH FIRST ${limit} ROWS ONLY`
           );
           return text(result);
+        }
+
+        if (driver === "redis") {
+          // Redis: use SLOWLOG for slow commands
+          const { runRedisQuery } = await import("../redis.js");
+          const result = await runRedisQuery(info as RedisConnectionInfo, `SLOWLOG GET ${limit}`);
+          return text({ slowlog: result.rows });
         }
 
         // MySQL 默认行为

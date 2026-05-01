@@ -15,6 +15,18 @@ export const RECOGNIZED_OPERATIONS = new Set([
   "CREATE", "ALTER", "DROP", "TRUNCATE",
   "GRANT", "REVOKE", "FLUSH", "OPTIMIZE", "REPAIR",
   "USE", "SET",
+  // Redis commands
+  "GET", "MGET", "KEYS", "TYPE", "EXISTS", "TTL", "GETRANGE",
+  "SMEMBERS", "HGET", "HGETALL", "LRANGE", "ZCARD", "ZCOUNT", "ZSCORE",
+  "ZRANGE", "ZRANGEBYSCORE", "PING", "DBSIZE", "INFO", "COMMAND",
+  "SET", "SETEX", "SETNX", "MSET", "MSETNX",
+  "DEL", "UNLINK", "FLUSHDB", "FLUSHALL",
+  "HSET", "HMSET", "HSETNX",
+  "LPUSH", "RPUSH", "LPUSHX", "RPUSHX", "LINSERT", "LTRIM", "LSET",
+  "SADD", "SPOP", "SREM", "SMOVE",
+  "ZADD", "ZINCRBY", "ZREM", "ZREMRANGEBYSCORE",
+  "INCR", "INCRBY", "INCRBYFLOAT", "DECR", "DECRBY",
+  "GETDEL", "GETEX",
 ]);
 
 interface PermissionBlock {

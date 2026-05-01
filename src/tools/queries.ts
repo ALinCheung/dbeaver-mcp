@@ -9,6 +9,7 @@ import { extractSqlKeyword, checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery, runWrite as runMysqlWrite } from "../mysql.js";
 import { runPostgresQuery, runPostgresWrite, isPostgresWriteOperation } from "../postgres.js";
 import { runOracleQuery, runOracleWrite, isOracleWriteOperation } from "../oracle.js";
+import { runRedisQuery, runRedisWrite, isRedisWriteOperation, RedisConnectionInfo } from "../redis.js";
 
 const WRITE_KEYWORDS = new Set([
   "INSERT", "UPDATE", "DELETE", "DROP", "TRUNCATE", "ALTER", "CREATE",
@@ -23,6 +24,9 @@ function text(data: unknown) {
  */
 function isWriteOperation(driver: string, query: string): boolean {
   const d = driver.toLowerCase();
+  if (d === "redis") {
+    return isRedisWriteOperation(query);
+  }
   if (d === "postgres" || d === "postgresql" || d === "postgres-jdbc") {
     return isPostgresWriteOperation(query);
   }
@@ -42,6 +46,10 @@ async function executeQuery(
   sql: string
 ): Promise<any> {
   const driver = (info.driver || "").toLowerCase();
+
+  if (driver === "redis") {
+    return await runRedisQuery(info as RedisConnectionInfo, sql);
+  }
 
   if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
     return await runPostgresQuery(info, sql);
@@ -63,6 +71,10 @@ async function executeWrite(
   sql: string
 ): Promise<any> {
   const driver = (info.driver || "").toLowerCase();
+
+  if (driver === "redis") {
+    return await runRedisWrite(info as RedisConnectionInfo, sql);
+  }
 
   if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
     return await runPostgresWrite(info, sql);

@@ -9,6 +9,7 @@ import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
 import { runPostgresQuery } from "../postgres.js";
 import { runOracleQuery } from "../oracle.js";
+import { redisConnect } from "../redis.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -25,6 +26,13 @@ async function testConnectionByDriver(
   try {
     let version = "";
     let result;
+
+    if (driver === "redis") {
+      const redis = await redisConnect(info as any);
+      version = await redis.ping();
+      await redis.quit();
+      return { success: true, version: `Redis ${version}` };
+    }
 
     if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
       result = await runPostgresQuery(info, "SELECT 1 AS ok, version() AS version");

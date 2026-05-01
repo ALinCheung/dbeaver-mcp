@@ -1,18 +1,18 @@
 ---
 name: dbeaver-mcp
 description: |
-  Conecta ao MySQL, PostgreSQL e Oracle via credenciais do DBeaver, executa queries,
+  Conecta ao MySQL, PostgreSQL, Oracle e Redis via credenciais do DBeaver, executa queries,
   gerencia conexões DBeaver (listar, adicionar, editar, remover), e aplica boas práticas
   de schema, indexação, otimização de queries e operações de banco de dados. Use SEMPRE
-  que o usuário mencionar banco de dados, MySQL, PostgreSQL, Oracle, queries SQL,
+  quando o usuário mencionar banco de dados, MySQL, PostgreSQL, Oracle, Redis, queries SQL,
   conexão DBeaver, schema, tabelas, índices, performance, deadlocks, migrações, ou
   pedir para rodar/consultar/analisar dados. Também use quando o usuário disser
   "conecta no banco", "roda essa query", "mostra as tabelas", "adiciona conexão no DBeaver".
 ---
 
-# DBeaver MCP — MySQL + PostgreSQL + Oracle + DBeaver Connection Manager
+# DBeaver MCP — MySQL + PostgreSQL + Oracle + Redis + DBeaver Connection Manager
 
-Skill completa para operar MySQL, PostgreSQL e Oracle via credenciais DBeaver com boas práticas de banco de dados.
+Skill completa para operar MySQL, PostgreSQL, Oracle e Redis via credenciais DBeaver com boas práticas de banco de dados.
 
 ## Arquitetura
 
@@ -20,11 +20,12 @@ Skill completa para operar MySQL, PostgreSQL e Oracle via credenciais DBeaver co
 Claude (skill)
     ↓ MCP stdio
 dbeaver-mcp server (Node.js)
-    ├── Lê credenciais do DBeaver (em memória, nunca em disco)
-    ├── Gerencia data-sources.json (adicionar/editar/remover conexões)
-    ├── Executa queries MySQL via mysql2
-    ├── Executa queries PostgreSQL via pg
-    └── Executa queries Oracle via oracledb
+├── Lê credenciais do DBeaver (em memória, nunca em disco)
+├── Gerencia data-sources.json (adicionar/editar/remover conexões)
+├── Executa queries MySQL via mysql2
+├── Executa queries PostgreSQL via pg
+├── Executa queries Oracle via oracledb
+└── Executa queries Redis via ioredis
 ```
 
 ## Início rápido
@@ -63,23 +64,39 @@ dbeaver-mcp server (Node.js)
 
 ### PostgreSQL
 
-| Tool | Descrição |
-|---|---|
-| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
-| `run_write` | Executa INSERT, UPDATE, DELETE, DDL (pede confirmação) |
-| `list_tables` | Lista tabelas de um banco (usa information_schema) |
-| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
-| `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
+|| Tool | Descrição |
+||---|---|
+|| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
+|| `run_write` | Executa INSERT, UPDATE, DELETE, DDL (pede confirmação) |
+|| `list_tables` | Lista tabelas de um banco (usa information_schema.tables) |
+|| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
+|| `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
+|| `show_processlist` | Mostra queries em execução (usa pg_stat_activity) |
+|| `show_slow_queries` | Lista queries lentas (usa pg_stat_statements) |
 
 ### Oracle
 
-| Tool | Descrição |
-|---|---|
-| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
-| `run_write` | Executa INSERT, UPDATE, DELETE, MERGE, DDL (pede confirmação) |
-| `list_tables` | Lista tabelas de um banco (usa all_tables/dba_tables) |
-| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
-| `explain_query` | Roda EXPLAIN PLAN e interpreta o plano de execução |
+|| Tool | Descrição |
+||---|---|
+|| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
+|| `run_write` | Executa INSERT, UPDATE, DELETE, MERGE, DDL (pede confirmação) |
+|| `list_tables` | Lista tabelas de um banco (usa ALL_TABLES) |
+|| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
+|| `explain_query` | Roda EXPLAIN PLAN e interpreta o plano de execução |
+| `show_processlist` | Mostra sessões ativas (usa V$SESSION) |
+| `show_slow_queries` | Lista queries lentas (usa V$SQL por tempo médio) |
+
+### Redis
+
+||| Tool | Descrição |
+|||---|---|
+||| `run_query` | Executa READ commands (GET, LRANGE, SCAN, etc.) |
+||| `run_write` | Executa WRITE commands (SET, DEL, LPUSH, etc.) (pede confirmação) |
+||| `list_tables` | Lista keys no Redis (usa SCAN) |
+||| `describe_table` | Retorna tipo e TTL de uma key |
+||| `explain_query` | Executa Redis DEBUG command para análise |
+||| `show_processlist` | Lista client connections (CLIENT LIST) |
+||| `show_slow_queries` | Lista slow commands (SLOWLOG) |
 
 ---
 
@@ -192,6 +209,31 @@ dbeaver-mcp server (Node.js)
 - Use `DBMS_SCHEDULER` para jobs agendados.
 - Monitore `V$SESSION` e `V$SQL` para performance.
 - partitioning é poderoso para grandes tabelas — use `RANGE` ou `LIST` partitioning.
+
+---
+
+## Redis — Boas Práticas
+
+### Schema Design
+- Keys: use nomes descritivos com `:` como separador (ex: `user:123:profile`).
+- Prefira estruturas nativas (HASH, LIST, SET, ZSET) sobre serialização JSON quando possível.
+- TTL em todas as keys temporárias — evite keys que crescem infinitamente.
+
+### Operações
+- `SCAN` ao invés de `KEYS` em produção (KEYS bloqueia o servidor).
+- `MULTI/EXEC` para transações; use Lua scripts para operações atômicas complexas.
+- `BITCOUNT`, `HINCRBY` para contadores — atômicos e eficientes.
+- Monitora `slowlog` — comandos O(N) com grandes datasets são problemáticos.
+
+### Performance
+- Connection pooling: ioredis gerencia nativamente; use `maxRetriesPerRequest` configurado.
+- Pipelining para batch de comandos — reduz round-trips.
+- `MONITOR` apenas temporariamente — impacto significativo em produção.
+
+### Operações
+- `BGSAVE` para snapshots assíncronos; `LASTSAVE` para verificar.
+- `INFO memory` para monitorar uso de memória.
+- `CLIENT KILL` para desconectar clientes específicos (use com cuidado).
 
 ---
 

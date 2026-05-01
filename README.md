@@ -20,8 +20,7 @@ Use your existing DBeaver database connections directly from Claude Code or Clau
 │                                             │
 │  1. Reads DBeaver's config files from disk  │
 │  2. Decrypts credentials in memory only     │
-│  3. Opens a direct database connection       │
-│     (MySQL/mysql2, PostgreSQL/pg, Oracle/oracledb) │
+│     (MySQL/mysql2, PostgreSQL/pg, Oracle/oracledb, Redis/ioredis) │
 │  4. Returns query results to Claude         │
 │  5. Closes connection — nothing persisted   │
 └──────┬──────────────────────────┬───────────┘
@@ -329,6 +328,7 @@ dbeaver-mcp/
 | `mysql2` | MySQL database driver (async/await) |
 | `pg` | PostgreSQL database driver |
 | `oracledb` | Oracle database driver |
+| `ioredis` | Redis database driver |
 | `zod` | Input schema validation for tool arguments |
 
 ## License

@@ -13,6 +13,7 @@ dbeaver-mcp/
 │   ├── mysql.ts            # Wrappers de conexão e execução de queries (mysql2)
 │   ├── postgres.ts         # Wrappers de conexão e execução de queries (pg)
 │   ├── oracle.ts           # Wrappers de conexão e execução de queries (oracledb)
+│   ├── redis.ts            # Wrappers de conexão e execução de queries (ioredis)
 │   └── tools/
 │       ├── connections.ts  # Tools: list, get, add, edit, remove, test connection
 │       ├── queries.ts      # Tools: run_query, run_write
@@ -49,9 +50,10 @@ O servidor usa protocolo MCP via stdio (JSON-RPC 2.0).
 
 | Driver | Banco | Pacote |
 |--------|-------|--------|
-| `mysql8` | MySQL | mysql2 |
-| `postgres` / `postgresql` | PostgreSQL | pg |
+| `mysql8`, `mysql5`, `mariadb` | MySQL 5.x/8.x, MariaDB | mysql2/promise |
+| `postgres`, `postgresql`, `postgres-jdbc` | PostgreSQL | pg |
 | `oracle` | Oracle | oracledb |
+| `redis` | Redis | ioredis |
 
 ## Registrar no Claude Code
 
@@ -78,7 +80,7 @@ claude mcp add dbeaver-mcp -- npx dbeaver-mcp
 |---|---|
 | `list_connections` | Lista conexões DBeaver (sem senhas) |
 | `get_connection` | Retorna detalhes de uma conexão pelo nome |
-| `add_connection` | Adiciona nova conexão (suporta mysql8, postgres, oracle) |
+| `add_connection` | Adiciona nova conexão (suporta mysql8, mysql5, mariadb, postgres, oracle, redis) |
 | `edit_connection` | Edita host/porta/banco (credenciais via DBeaver) |
 | `remove_connection` | Remove uma conexão |
 | `test_connection` | Testa conectividade |
