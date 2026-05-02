@@ -30,4 +30,5 @@ desktop.ini
 
 # claude
 .claude
+.playwright-cli
 openspec

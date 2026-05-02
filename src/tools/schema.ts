@@ -25,7 +25,7 @@ async function executeQuery(
 ): Promise<any> {
   const driver = (info.driver || "").toLowerCase();
 
-  if (driver === "postgres" || driver === "postgresql") {
+  if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
     return await runPostgresQuery(info, sql, params);
   }
 
@@ -57,7 +57,7 @@ export function registerSchemaTools(server: McpServer): void {
         const driver = (info.driver || "").toLowerCase();
         let result;
 
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           // PostgreSQL: 使用 information_schema
           result = await executeQuery(info,
             `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`
@@ -116,7 +116,7 @@ export function registerSchemaTools(server: McpServer): void {
 
         const driver = (info.driver || "").toLowerCase();
 
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           // PostgreSQL: 获取列信息
           const columnsResult = await executeQuery(info,
             `SELECT column_name, data_type, is_nullable, column_default
@@ -250,7 +250,7 @@ export function registerSchemaTools(server: McpServer): void {
         const driver = (info.driver || "").toLowerCase();
         let explainSql;
 
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           explainSql = `EXPLAIN ${sql.trim()}`;
         } else if (driver === "oracle") {
           explainSql = `EXPLAIN PLAN SET STATEMENT_ID = 'MCP' FOR ${sql.trim()}`;
@@ -265,7 +265,7 @@ export function registerSchemaTools(server: McpServer): void {
         const redFlags: string[] = [];
 
         // 根据数据库类型分析执行计划
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           for (const row of basic.rows) {
             const plan = JSON.stringify(row).toLowerCase();
             if (plan.includes("seq scan")) redFlags.push(`全表扫描 (Seq Scan) 检测到`);
@@ -311,7 +311,7 @@ export function registerSchemaTools(server: McpServer): void {
 
         const driver = (info.driver || "").toLowerCase();
 
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           const result = await executeQuery(info,
             `SELECT pid, usename, application_name, client_addr, state, query_start, query
              FROM pg_stat_activity WHERE state IS NOT NULL ORDER BY query_start DESC`
@@ -359,7 +359,7 @@ export function registerSchemaTools(server: McpServer): void {
 
         const driver = (info.driver || "").toLowerCase();
 
-        if (driver === "postgres" || driver === "postgresql") {
+        if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           const result = await executeQuery(info,
             `SELECT query, calls, total_exec_time, mean_exec_time, rows
              FROM pg_stat_statements

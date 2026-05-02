@@ -50,7 +50,6 @@ function workspaceCandidates(): string[] {
       const appdata = process.env.APPDATA || path.join(home, "AppData", "Roaming");
       return [
         path.join(appdata, "DBeaverData", "workspace6", "General", ".dbeaver"),
-        path.join(home, "AppData", "Roaming", "DBeaverData", "workspace6", "General", ".dbeaver"),
       ];
     }
   }
