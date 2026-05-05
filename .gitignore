@@ -31,4 +31,5 @@ desktop.ini
 # claude
 .claude
 .playwright-cli
+.code-review-graph
 openspec
