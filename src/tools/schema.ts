@@ -58,10 +58,18 @@ export function registerSchemaTools(server: McpServer): void {
         let result;
 
         if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
-          // PostgreSQL: 使用 information_schema
-          result = await executeQuery(info,
-            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`
-          );
+          // PostgreSQL: 优先使用 information_schema，失败则降级到 pg_tables
+          try {
+            result = await executeQuery(info,
+              `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`
+            );
+          } catch (schemaErr: any) {
+            // KingbaseES 等国产数据库可能因权限问题无法访问 information_schema
+            // 降级使用 pg_tables 系统表
+            result = await executeQuery(info,
+              `SELECT tablename as table_name FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
+            );
+          }
           const tables = result.rows.map((r: any) => r.table_name);
           return text({ database: db, tables, total: tables.length });
         }
