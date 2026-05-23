@@ -30,6 +30,8 @@ desktop.ini
 
 # claude
 .claude
+.claude.json
+.mcp.json
 .playwright-cli
 .code-review-graph
 openspec

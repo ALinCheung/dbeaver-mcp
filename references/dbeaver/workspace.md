@@ -1,28 +1,28 @@
 ---
-title: DBeaver — Workspace e Caminhos por OS
-description: Onde o DBeaver armazena dados em cada sistema operacional
+title: DBeaver — Workspace and Paths by OS
+description: Where DBeaver stores data on each operating system
 ---
 
-# DBeaver — Workspace por OS
+# DBeaver — Workspace by OS
 
 ## macOS
 
-### Instalação padrão (.dmg)
+### Standard Installation (.dmg)
 ```
 ~/Library/DBeaverData/workspace6/General/.dbeaver/
 ```
 
-### Instalação via Homebrew Cask
+### Homebrew Cask Installation
 ```
 ~/Library/Application Support/DBeaverData/workspace6/General/.dbeaver/
 ```
 
-### Localizar manualmente
-No DBeaver: **Help → Installation Details → Configuration** — campo "User home directory".
+### Finding Manually
+In DBeaver: **Help → Installation Details → Configuration** — field "User home directory".
 
 ## Linux
 
-### Instalação .deb / .rpm / tar.gz
+### Standard Installation .deb / .rpm / tar.gz
 ```
 ~/.local/share/DBeaverData/workspace6/General/.dbeaver/
 ```
@@ -39,42 +39,42 @@ No DBeaver: **Help → Installation Details → Configuration** — campo "User 
 
 ## Windows
 
-### Instalação padrão
+### Standard Installation
 ```
 %APPDATA%\DBeaverData\workspace6\General\.dbeaver\
-C:\Users\<usuario>\AppData\Roaming\DBeaverData\workspace6\General\.dbeaver\
+C:\Users\<user>\AppData\Roaming\DBeaverData\workspace6\General\.dbeaver\
 ```
 
-### Instalação portátil
+### Portable Installation
 ```
-<pasta-dbeaver>\workspace6\General\.dbeaver\
+<dbeaver-folder>\workspace6\General\.dbeaver\
 ```
 
-## Arquivos relevantes no workspace
+## Relevant Files in Workspace
 
-| Arquivo | Conteúdo |
+| File | Contents |
 |---|---|
-| `data-sources.json` | Metadados de todas as conexões |
-| `credentials-config.json` | Senhas criptografadas |
-| `drivers.json` | Drivers customizados |
-| `connection-types.json` | Tipos de conexão (Dev, Prod, etc.) |
+| `data-sources.json` | Metadata for all connections |
+| `credentials-config.json` | Encrypted passwords |
+| `drivers.json` | Custom drivers |
+| `connection-types.json` | Connection types (Dev, Prod, etc.) |
 
-## Versões do workspace
+## Workspace Versions
 
-O sufixo `workspace6` corresponde ao DBeaver 6+. Versões mais antigas usam `workspace4` ou `workspace5`. O dbeaver-mcp suporta apenas `workspace6`.
+The `workspace6` suffix corresponds to DBeaver 6+. Older versions use `workspace4` or `workspace5`. dbeaver-mcp only supports `workspace6`.
 
-## Workspace customizado
+## Custom Workspace
 
-Se o usuário iniciou o DBeaver com `-data /caminho/customizado`, o workspace estará nesse caminho. Nesse caso, passe o caminho manualmente:
+If the user started DBeaver with `-data /custom/path`, the workspace will be at that path. In this case, pass the path manually:
 
 ```python
 import dbeaver
 ws = dbeaver.find_workspace()  # auto-detect
-# ou
-ws = Path("/caminho/customizado/General/.dbeaver")
+# or
+ws = Path("/custom/path/General/.dbeaver")
 conns = dbeaver.list_connections_safe(workspace=ws)
 ```
 
-## Múltiplos workspaces
+## Multiple Workspaces
 
-O DBeaver permite múltiplos workspaces. O dbeaver-mcp usa sempre o primeiro encontrado na ordem de candidatos. Se o usuário tiver workspaces múltiplos, precisará informar o caminho manualmente.
+DBeaver allows multiple workspaces. dbeaver-mcp always uses the first found in candidate order. If the user has multiple workspaces, they will need to provide the path manually.

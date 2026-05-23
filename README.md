@@ -2,15 +2,15 @@
 
 MCP server that exposes your DBeaver connections to Claude as tools. Decrypts credentials in memory — never persists passwords to disk.
 
-**[Leia em Português](README.pt-br.md)**
+**[Read in Chinese](README.zh-CN.md)**
 
-Use your existing DBeaver database connections directly from Claude Code or Claude Desktop to query, manage, and analyze MySQL, PostgreSQL, and Oracle databases without re-entering credentials.
+Use your existing DBeaver database connections directly from Claude Code to query, manage, and analyze MySQL, PostgreSQL, and Oracle databases without re-entering credentials.
 
 ## How It Works
 
 ```
 ┌─────────────────────────┐
-│  Claude Code / Desktop  │
+│       Claude Code       │
 └───────────┬─────────────┘
             │ MCP stdio (JSON-RPC 2.0)
             │ Only tool calls flow here — never raw credentials
@@ -18,17 +18,18 @@ Use your existing DBeaver database connections directly from Claude Code or Clau
 ┌─────────────────────────────────────────────┐
 │          dbeaver-mcp (Node.js)              │
 │                                             │
-│  1. Reads DBeaver's config files from disk  │
-│  2. Decrypts credentials in memory only     │
-│     (MySQL/mysql2, PostgreSQL/pg, Oracle/oracledb, Redis/ioredis) │
-│  4. Returns query results to Claude         │
-│  5. Closes connection — nothing persisted   │
-└──────┬──────────────────────────┬───────────┘
+│  1. Reads DBeaver's config files from disk   │
+│  2. Decrypts credentials in memory only      │
+│     (MySQL/mysql2, PostgreSQL/pg,           │
+│      Oracle/oracledb, Redis/ioredis)        │
+│  3. Returns query results to Claude          │
+│  4. Closes connection — nothing persisted   │
+└──────┬──────────────────────────┬──────────┘
        │                          │
        ▼                          ▼
   DBeaver workspace         Database server
   (data-sources.json,       (MySQL, PostgreSQL,
-   credentials-config.json)   or Oracle)
+   credentials-config.json)  Oracle, Redis)
 ```
 
 ### Step by step
@@ -86,110 +87,43 @@ Use your existing DBeaver database connections directly from Claude Code or Clau
 
 Every line of the credential handling is in [`src/dbeaver.ts`](src/dbeaver.ts). The decryption function is ~10 lines. There are no network calls, no telemetry, no external services. You can audit it in minutes.
 
-## Quick Start
+## Installation
 
-### Option 1: One command (recommended)
+### One-time setup
 
-Works on all operating systems. Registers dbeaver-mcp globally in Claude Code:
-
-```bash
-claude mcp add dbeaver-mcp -- npx dbeaver-mcp
-```
-
-### Option 2: Built-in installer
-
-Runs setup interactively — verifies your DBeaver workspace, creates `~/.dbeaver-mcp/settings.json`, and registers the server in Claude Code automatically:
+**Step 1: Clone and build**
 
 ```bash
-npx dbeaver-mcp install
+git clone https://github.com/ALinCheung/dbeaver-mcp.git ~/.claude/skills/dbeaver-mcp
+cd ~/.claude/skills/dbeaver-mcp
+npm install && npm run build
+npm link
 ```
 
-To register globally for all projects, add `--scope user`:
+**Step 2: Verify installation**
 
 ```bash
-claude mcp add dbeaver-mcp --scope user -- npx dbeaver-mcp
+npx dbeaver-mcp --version
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`):
+**Step 3: Register MCP server**
+
+Add the following to `~/.claude.json` (Claude Code) or `~/.config/opencode/opencode.json` (OpenCode):
 
 ```json
 {
   "mcpServers": {
     "dbeaver-mcp": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["dbeaver-mcp"]
+      "args": ["dbeaver-mcp"],
+      "env": {}
     }
   }
 }
 ```
 
-### Option 3: Manual Setup
-
-```bash
-git clone https://github.com/lucascborges/dbeaver-mcp.git ~/.skills/dbeaver-mcp
-cd ~/.skills/dbeaver-mcp && npm install && npm run build
-```
-
-**Register in Claude Code:**
-```bash
-claude mcp add dbeaver-mcp -- node ~/.skills/dbeaver-mcp/dist/index.js
-```
-
-**Register in Claude Desktop** (`claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "dbeaver-mcp": {
-      "command": "node",
-      "args": ["~/.skills/dbeaver-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-### Option 4: 打包后注册（本地构建）
-
-如果你已经克隆项目并构建了打包文件，可以使用以下方法注册 MCP：
-
-**构建项目：**
-```bash
-git clone https://github.com/lucascborges/dbeaver-mcp.git
-cd dbeaver-mcp
-npm install
-npm run build
-```
-
-**Claude Code 注册：**
-```bash
-claude mcp add dbeaver-mcp -- node /path/to/dbeaver-mcp/dist/index.js
-```
-
-全局注册（所有项目可用）：
-```bash
-claude mcp add dbeaver-mcp --scope user -- node /path/to/dbeaver-mcp/dist/index.js
-```
-
-**OpenCode 注册：**
-
-在 OpenCode 的 MCP 配置中添加：
-
-```json
-{
-  "mcpServers": {
-    "dbeaver-mcp": {
-      "command": "node",
-      "args": ["/path/to/dbeaver-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-或者通过命令行注册：
-```bash
-opencode mcp add dbeaver-mcp -- node /path/to/dbeaver-mcp/dist/index.js
-```
-
-**注意：** 请将 `/path/to/dbeaver-mcp/` 替换为你的实际项目路径。
+### Direct Connect Mode
 
 ## Available Tools
 

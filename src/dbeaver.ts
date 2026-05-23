@@ -29,6 +29,40 @@ export interface FullConnectionInfo extends ConnectionInfo {
   password: string;
 }
 
+// CLI direct connection params
+export interface ConnectParams {
+  host: string;
+  port?: number;
+  username?: string;
+  password: string;
+  database: string;
+  driver?: string;
+}
+
+// Driver -> default port mapping
+export const DRIVER_DEFAULT_PORTS: Record<string, number> = {
+  mysql8: 3306, mysql5: 3306, mariadb: 3306,
+  postgres: 5432, postgresql: 5432, "postgres-jdbc": 5432,
+  oracle: 1521,
+  redis: 6379,
+};
+
+// Build FullConnectionInfo from connect params
+export function buildConnectionInfo(params: ConnectParams): FullConnectionInfo {
+  const driver = params.driver || "mysql8";
+  const port = params.port || DRIVER_DEFAULT_PORTS[driver] || 3306;
+  return {
+    id: `direct-${driver}-${Date.now()}`,
+    name: `direct:${params.host}:${port}/${params.database}`,
+    driver,
+    host: params.host,
+    port: String(port),
+    database: params.database,
+    user: params.username || "",
+    password: params.password,
+  };
+}
+
 // ── Workspace detection ─────────────────────────────────────────────────────
 
 function workspaceCandidates(): string[] {
@@ -60,7 +94,7 @@ export function findWorkspace(): string {
     if (fs.existsSync(p)) return p;
   }
   const paths = workspaceCandidates().map((p) => `  ${p}`).join("\n");
-  throw new Error(`Workspace do DBeaver não encontrado.\nCaminhos verificados:\n${paths}`);
+  throw new Error(`DBeaver workspace not found.\nPaths checked:\n${paths}`);
 }
 
 // ── JSON helpers ────────────────────────────────────────────────────────────

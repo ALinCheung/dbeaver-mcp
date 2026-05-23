@@ -1,298 +1,298 @@
 ---
 name: dbeaver-mcp
 description: |
-  Conecta ao MySQL, PostgreSQL, Oracle e Redis via credenciais do DBeaver, executa queries,
-  gerencia conexões DBeaver (listar, adicionar, editar, remover), e aplica boas práticas
-  de schema, indexação, otimização de queries e operações de banco de dados. Use SEMPRE
-  quando o usuário mencionar banco de dados, MySQL, PostgreSQL, Oracle, Redis, queries SQL,
-  conexão DBeaver, schema, tabelas, índices, performance, deadlocks, migrações, ou
-  pedir para rodar/consultar/analisar dados. Também use quando o usuário disser
-  "conecta no banco", "roda essa query", "mostra as tabelas", "adiciona conexão no DBeaver".
+  Connects to MySQL, PostgreSQL, Oracle, and Redis via DBeaver credentials, executes queries,
+  manages DBeaver connections (list, add, edit, remove), and applies best practices
+  for schema, indexing, query optimization, and database operations. Use ALWAYS
+  when the user mentions database, MySQL, PostgreSQL, Oracle, Redis, SQL queries,
+  DBeaver connection, schema, tables, indexes, performance, deadlocks, migrations, or
+  asks to run/query/analyze data. Also use when the user says
+  "connect to database", "run this query", "show tables", "add connection in DBeaver".
 ---
 
 # DBeaver MCP — MySQL + PostgreSQL + Oracle + Redis + DBeaver Connection Manager
 
-Skill completa para operar MySQL, PostgreSQL, Oracle e Redis via credenciais DBeaver com boas práticas de banco de dados.
+Complete skill for operating MySQL, PostgreSQL, Oracle, and Redis via DBeaver credentials with database best practices.
 
-## Arquitetura
+## Architecture
 
 ```
 Claude (skill)
     ↓ MCP stdio
 dbeaver-mcp server (Node.js)
-├── Lê credenciais do DBeaver (em memória, nunca em disco)
-├── Gerencia data-sources.json (adicionar/editar/remover conexões)
-├── Executa queries MySQL via mysql2
-├── Executa queries PostgreSQL via pg
-├── Executa queries Oracle via oracledb
-└── Executa queries Redis via ioredis
+├── Reads DBeaver credentials (in memory, never on disk)
+├── Manages data-sources.json (add/edit/remove connections)
+├── Executes MySQL queries via mysql2
+├── Executes PostgreSQL queries via pg
+├── Executes Oracle queries via oracledb
+└── Executes Redis commands via ioredis
 ```
 
-## Início rápido
+## Quick Start
 
-1. Verificar se o servidor MCP está rodando: pergunte ao usuário se instalou via `npx dbeaver-mcp install`
-2. Se não instalado: instrua a instalar (veja seção Instalação abaixo)
-3. Listar conexões disponíveis com `list_connections`
-4. Pedir qual conexão usar se não for óbvio no contexto
+1. Check if MCP server is running: ask the user if they installed via `npx dbeaver-mcp install`
+2. If not installed: instruct to install (see Installation section below)
+3. List available connections with `list_connections`
+4. Ask which connection to use if not obvious in context
 
 ---
 
-## Tools MCP disponíveis
+## Available MCP Tools
 
-### Conexões DBeaver
+### DBeaver Connections
 
-| Tool | Descrição |
+| Tool | Description |
 |---|---|
-| `list_connections` | Lista todas as conexões DBeaver com host/porta/banco |
-| `get_connection` | Retorna detalhes de uma conexão pelo nome |
-| `add_connection` | Adiciona nova conexão ao DBeaver (configure credenciais no DBeaver) |
-| `edit_connection` | Edita host, porta ou banco de uma conexão (credenciais via DBeaver) |
-| `remove_connection` | Remove uma conexão do DBeaver (pede confirmação) |
-| `test_connection` | Testa se uma conexão está funcionando |
+| `list_connections` | List all DBeaver connections with host/port/database |
+| `get_connection` | Returns details of a connection by name |
+| `add_connection` | Add new connection to DBeaver (configure credentials in DBeaver) |
+| `edit_connection` | Edit host, port or database of a connection (credentials via DBeaver) |
+| `remove_connection` | Remove a connection from DBeaver (asks for confirmation) |
+| `test_connection` | Test if a connection is working |
 
 ### MySQL
 
-| Tool | Descrição |
+| Tool | Description |
 |---|---|
-| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
-| `run_write` | Executa INSERT, UPDATE, DELETE, DDL (pede confirmação) |
-| `list_tables` | Lista tabelas de um banco |
-| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
-| `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
-| `show_processlist` | Mostra queries em execução no servidor (MySQL) |
-| `show_slow_queries` | Lista queries lentas do performance_schema (MySQL) |
+| `run_query` | Execute SELECT, SHOW, EXPLAIN, DESCRIBE |
+| `run_write` | Execute INSERT, UPDATE, DELETE, DDL (asks for confirmation) |
+| `list_tables` | List tables in a database |
+| `describe_table` | Describe structure, indexes and constraints of a table |
+| `explain_query` | Run EXPLAIN and interpret execution plan |
+| `show_processlist` | Show running queries on server (MySQL) |
+| `show_slow_queries` | List slow queries from performance_schema (MySQL) |
 
 ### PostgreSQL
 
-|| Tool | Descrição |
+|| Tool | Description |
 ||---|---|
-|| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
-|| `run_write` | Executa INSERT, UPDATE, DELETE, DDL (pede confirmação) |
-|| `list_tables` | Lista tabelas de um banco (usa information_schema.tables) |
-|| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
-|| `explain_query` | Roda EXPLAIN e interpreta o plano de execução |
-|| `show_processlist` | Mostra queries em execução (usa pg_stat_activity) |
-|| `show_slow_queries` | Lista queries lentas (usa pg_stat_statements) |
+|| `run_query` | Execute SELECT, SHOW, EXPLAIN, DESCRIBE |
+|| `run_write` | Execute INSERT, UPDATE, DELETE, DDL (asks for confirmation) |
+|| `list_tables` | List tables in a database (uses information_schema.tables) |
+|| `describe_table` | Describe structure, indexes and constraints of a table |
+|| `explain_query` | Run EXPLAIN and interpret execution plan |
+|| `show_processlist` | Show running queries (uses pg_stat_activity) |
+|| `show_slow_queries` | List slow queries (uses pg_stat_statements) |
 
 ### Oracle
 
-|| Tool | Descrição |
+|| Tool | Description |
 ||---|---|
-|| `run_query` | Executa SELECT, SHOW, EXPLAIN, DESCRIBE |
-|| `run_write` | Executa INSERT, UPDATE, DELETE, MERGE, DDL (pede confirmação) |
-|| `list_tables` | Lista tabelas de um banco (usa ALL_TABLES) |
-|| `describe_table` | Descreve estrutura, índices e constraints de uma tabela |
-|| `explain_query` | Roda EXPLAIN PLAN e interpreta o plano de execução |
-| `show_processlist` | Mostra sessões ativas (usa V$SESSION) |
-| `show_slow_queries` | Lista queries lentas (usa V$SQL por tempo médio) |
+|| `run_query` | Execute SELECT, SHOW, EXPLAIN, DESCRIBE |
+|| `run_write` | Execute INSERT, UPDATE, DELETE, MERGE, DDL (asks for confirmation) |
+|| `list_tables` | List tables in a database (uses ALL_TABLES) |
+|| `describe_table` | Describe structure, indexes and constraints of a table |
+|| `explain_query` | Run EXPLAIN PLAN and interpret execution plan |
+| `show_processlist` | Show active sessions (uses V$SESSION) |
+| `show_slow_queries` | List slow queries (uses V$SQL by average time) |
 
 ### Redis
 
-||| Tool | Descrição |
+||| Tool | Description |
 |||---|---|
-||| `run_query` | Executa READ commands (GET, LRANGE, SCAN, etc.) |
-||| `run_write` | Executa WRITE commands (SET, DEL, LPUSH, etc.) (pede confirmação) |
-||| `list_tables` | Lista keys no Redis (usa SCAN) |
-||| `describe_table` | Retorna tipo e TTL de uma key |
-||| `explain_query` | Executa Redis DEBUG command para análise |
-||| `show_processlist` | Lista client connections (CLIENT LIST) |
-||| `show_slow_queries` | Lista slow commands (SLOWLOG) |
+||| `run_query` | Execute READ commands (GET, LRANGE, SCAN, etc.) |
+||| `run_write` | Execute WRITE commands (SET, DEL, LPUSH, etc.) (asks for confirmation) |
+||| `list_tables` | List keys in Redis (uses SCAN) |
+||| `describe_table` | Returns type and TTL of a key |
+||| `explain_query` | Execute Redis DEBUG command for analysis |
+||| `show_processlist` | List client connections (CLIENT LIST) |
+||| `show_slow_queries` | List slow commands (SLOWLOG) |
 
 ---
 
-## Workflow padrão
+## Standard Workflow
 
-### Para queries e análise
-1. `list_connections` → identificar a conexão correta
-2. `test_connection` → verificar conectividade
-3. `list_tables` ou `describe_table` → entender o schema
-4. `explain_query` antes de sugerir índices
-5. `run_query` → executar e analisar resultado
+### For queries and analysis
+1. `list_connections` → identify the correct connection
+2. `test_connection` → verify connectivity
+3. `list_tables` or `describe_table` → understand the schema
+4. `explain_query` before suggesting indexes
+5. `run_query` → execute and analyze result
 
-### Para operações destrutivas (DELETE, DROP, TRUNCATE)
-1. Sempre confirmar com o usuário antes de executar
-2. Sugerir backup ou `SELECT` equivalente primeiro
-3. Usar `run_write` com flag `--dry-run` se disponível
+### For destructive operations (DELETE, DROP, TRUNCATE)
+1. Always confirm with the user before executing
+2. Suggest backup or equivalent `SELECT` first
+3. Use `run_write` with flag `--dry-run` if available
 
-### Para gerenciar conexões DBeaver
-1. `list_connections` → ver o que já existe
-2. `add_connection` / `edit_connection` / `remove_connection` conforme necessário
-3. `test_connection` após qualquer mudança
+### For managing DBeaver connections
+1. `list_connections` → see what already exists
+2. `add_connection` / `edit_connection` / `remove_connection` as needed
+3. `test_connection` after any changes
 
 ---
 
-## MySQL — Boas Práticas
+## MySQL — Best Practices
 
 ### Schema Design
-- PKs: `BIGINT UNSIGNED AUTO_INCREMENT` para OLTP. Evite UUID aleatório como PK clustered.
-- Sempre `utf8mb4` / `utf8mb4_0900_ai_ci`. Prefira `NOT NULL`, `DATETIME` sobre `TIMESTAMP`.
-- Lookup tables em vez de `ENUM`. Normalize para 3NF; desnormalize apenas em hot paths medidos.
+- PKs: `BIGINT UNSIGNED AUTO_INCREMENT` for OLTP. Avoid random UUID as PK clustered index.
+- Always `utf8mb4` / `utf8mb4_0900_ai_ci`. Prefer `NOT NULL`, `DATETIME` over `TIMESTAMP`.
+- Lookup tables instead of `ENUM`. Normalize to 3NF; denormalize only on measured hot paths.
 
-### Indexação
-- Ordem em índice composto: igualdade primeiro, depois range/sort (regra do prefixo mais à esquerda).
-- Predicados de range param o uso do índice para colunas subsequentes.
-- Audite via `performance_schema` — remova índices com `COUNT_READ = 0`.
+### Indexing
+- Order in composite index: equality first, then range/sort (leftmost prefix rule).
+- Range predicates limit index use for subsequent columns.
+- Audit via `performance_schema` — remove indexes with `COUNT_READ = 0`.
 
-### Otimização de Queries
-- Cheque `EXPLAIN` — red flags: `type: ALL`, `Using filesort`, `Using temporary`.
-- Paginação por cursor, não `OFFSET`. Evite funções em colunas indexadas no `WHERE`.
-- Batch inserts (500–5000 rows). `UNION ALL` sobre `UNION` quando dedup for desnecessário.
+### Query Optimization
+- Check `EXPLAIN` — red flags: `type: ALL`, `Using filesort`, `Using temporary`.
+- Cursor pagination, not `OFFSET`. Avoid functions on indexed columns in `WHERE`.
+- Batch inserts (500–5000 rows). `UNION ALL` over `UNION` when dedup is unnecessary.
 
 ### Transactions & Locking
-- Default: `REPEATABLE READ` (gap locks). Use `READ COMMITTED` para alta contenção.
-- Acesso consistente a linhas previne deadlocks. Retry em erro 1213 com backoff.
-- Faça I/O fora de transactions. Use `SELECT ... FOR UPDATE` com parcimônia.
+- Default: `REPEATABLE READ` (gap locks). Use `READ COMMITTED` for high contention.
+- Consistent row access prevents deadlocks. Retry on error 1213 with backoff.
+- Do I/O outside transactions. Use `SELECT ... FOR UPDATE` sparingly.
 
-### Operações
-- Use online DDL (`ALGORITHM=INPLACE`) quando possível; teste em réplicas primeiro.
-- Tune connection pooling — evite esgotamento de `max_connections` sob carga.
-- Monitore replication lag; evite leituras obsoletas de réplicas durante writes.
+### Operations
+- Use online DDL (`ALGORITHM=INPLACE`) when possible; test on replicas first.
+- Tune connection pooling — avoid exhausting `max_connections` under load.
+- Monitor replication lag; avoid stale reads from replicas during writes.
 
 ---
 
-## PostgreSQL — Boas Práticas
+## PostgreSQL — Best Practices
 
 ### Schema Design
-- PKs: `BIGSERIAL` ou `GENERATED ALWAYS AS IDENTITY` para OLTP. Evite UUID aleatório como PK se não for necessário.
-- Sempre `utf88` / `en_US.UTF-8`. Prefira `NOT NULL`, `TIMESTAMP WITH TIME ZONE` sobre `TIMESTAMP`.
-- Lookup tables em vez de `ENUM`. Normalize para 3NF; desnormalize apenas em hot paths medidos.
+- PKs: `BIGSERIAL` or `GENERATED ALWAYS AS IDENTITY` for OLTP. Avoid random UUID as PK if not needed.
+- Always `utf8` / `en_US.UTF-8`. Prefer `NOT NULL`, `TIMESTAMP WITH TIME ZONE` over `TIMESTAMP`.
+- Lookup tables instead of `ENUM`. Normalize to 3NF; denormalize only on measured hot paths.
 
-### Indexação
-- Índices compostos: ordem importa — igualdade primeiro, depois range/sort.
-- Predicados de range param o uso do índice para colunas subsequentes.
-- Use `INCLUDE` em índices para cobrir queries sem hit adicional na tabela.
-- Monitore uso de índices via `pg_stat_user_indexes`.
+### Indexing
+- Composite indexes: order matters — equality first, then range/sort.
+- Range predicates limit index use for subsequent columns.
+- Use `INCLUDE` in indexes to cover queries without additional table hit.
+- Monitor index usage via `pg_stat_user_indexes`.
 
-### Otimização de Queries
-- Cheque `EXPLAIN (ANALYZE, BUFFERS)` — red flags: Seq Scan, Hash Join com grandes rows, Sort com grande custo.
-- Paginação por cursor (`WHERE id > last_id`) ou `KEYSETpagination`, não `OFFSET`.
-- Evite funções em colunas indexadas no `WHERE` — usa índices expression se necessário.
-- Batch inserts via `COPY` para grandes volumes.
+### Query Optimization
+- Check `EXPLAIN (ANALYZE, BUFFERS)` — red flags: Seq Scan, Hash Join with large rows, Sort with high cost.
+- Cursor pagination (`WHERE id > last_id`) or `KEYSETpagination`, not `OFFSET`.
+- Avoid functions on indexed columns in `WHERE` — use expression indexes if needed.
+- Batch inserts via `COPY` for large volumes.
 
 ### Transactions & Locking
-- Default: `READ COMMITTED`. Use `REPEATABLE READ` para maior consistência.
-- Acesso consistente a linhas previne deadlocks. Retry em erro 40001 com backoff.
-- Keep transactions curtas — evite long transactions que causam bloat de MVCC.
+- Default: `READ COMMITTED`. Use `REPEATABLE READ` for stronger consistency.
+- Consistent row access prevents deadlocks. Retry on error 40001 with backoff.
+- Keep transactions short — avoid long transactions that cause MVCC bloat.
 
-### Operações
-- Use `CREATE INDEX CONCURRENTLY` para índices em produção — não bloqueia writes.
-- Monitore `pg_stat_activity` para queries lentas e locks.
-- VACUUM e ANALYZE são essenciais — autovacuum cobre a maioria dos casos.
+### Operations
+- Use `CREATE INDEX CONCURRENTLY` for indexes in production — does not block writes.
+- Monitor `pg_stat_activity` for slow queries and locks.
+- VACUUM and ANALYZE are essential — autovacuum covers most cases.
 
 ---
 
-## Oracle — Boas Práticas
+## Oracle — Best Practices
 
 ### Schema Design
-- PKs: `NUMBER GENERATED ALWAYS AS IDENTITY` para OLTP.
-- Prefira `NOT NULL`, `TIMESTAMP` ou `DATE` conforme necessidade.
-- Lookup tables em vez de `ENUM`. Normalize para 3NF; desnormalize apenas em hot paths medidos.
+- PKs: `NUMBER GENERATED ALWAYS AS IDENTITY` for OLTP.
+- Prefer `NOT NULL`, `TIMESTAMP` or `DATE` as needed.
+- Lookup tables instead of `ENUM`. Normalize to 3NF; denormalize only on measured hot paths.
 
-### Indexação
-- Ordem em índice composto: igualdade primeiro, depois range/sort.
-- Predicados de range param o uso do índice para colunas subsequentes.
-- Use índices funcionais para colunas calculadas.
-- Monitore uso de índices via `USER_INDEXES` / `DBA_INDEXES`.
+### Indexing
+- Order in composite index: equality first, then range/sort.
+- Range predicates limit index use for subsequent columns.
+- Use functional indexes for computed columns.
+- Monitor index usage via `USER_INDEXES` / `DBA_INDEXES`.
 
-### Otimização de Queries
-- Cheque `EXPLAIN PLAN` — red flags: FULL TABLE SCAN, SORT, HASH JOIN com grandes datasets.
-- Paginação via `ROWNUM` ou `FETCH FIRST N ROWS ONLY` (Oracle 12c+).
-- Evite funções em colunas indexadas no `WHERE`.
-- Use binds variables para queries repetidas.
+### Query Optimization
+- Check `EXPLAIN PLAN` — red flags: FULL TABLE SCAN, SORT, HASH JOIN with large datasets.
+- Pagination via `ROWNUM` or `FETCH FIRST N ROWS ONLY` (Oracle 12c+).
+- Avoid functions on indexed columns in `WHERE`.
+- Use bind variables for repeated queries.
 
 ### Transactions & Locking
-- Default: `READ COMMITTED`. Use `SERIALIZABLE` para maior consistência (com cuidado).
-- Deadlocks podem ocorrer — implemente retry logic com backoff exponencial.
-- Minimize o tempo de hold de locks — não faça interação do usuário dentro de transactions.
+- Default: `READ COMMITTED`. Use `SERIALIZABLE` for stronger consistency (with care).
+- Deadlocks can occur — implement retry logic with exponential backoff.
+- Minimize lock hold time — don't do user interaction inside transactions.
 
-### Operações
-- Use `DBMS_SCHEDULER` para jobs agendados.
-- Monitore `V$SESSION` e `V$SQL` para performance.
-- partitioning é poderoso para grandes tabelas — use `RANGE` ou `LIST` partitioning.
+### Operations
+- Use `DBMS_SCHEDULER` for scheduled jobs.
+- Monitor `V$SESSION` and `V$SQL` for performance.
+- Partitioning is powerful for large tables — use `RANGE` or `LIST` partitioning.
 
 ---
 
-## Redis — Boas Práticas
+## Redis — Best Practices
 
 ### Schema Design
-- Keys: use nomes descritivos com `:` como separador (ex: `user:123:profile`).
-- Prefira estruturas nativas (HASH, LIST, SET, ZSET) sobre serialização JSON quando possível.
-- TTL em todas as keys temporárias — evite keys que crescem infinitamente.
+- Keys: use descriptive names with `:` as separator (e.g., `user:123:profile`).
+- Prefer native structures (HASH, LIST, SET, ZSET) over JSON serialization when possible.
+- TTL on all temporary keys — avoid keys that grow infinitely.
 
-### Operações
-- `SCAN` ao invés de `KEYS` em produção (KEYS bloqueia o servidor).
-- `MULTI/EXEC` para transações; use Lua scripts para operações atômicas complexas.
-- `BITCOUNT`, `HINCRBY` para contadores — atômicos e eficientes.
-- Monitora `slowlog` — comandos O(N) com grandes datasets são problemáticos.
+### Operations
+- `SCAN` instead of `KEYS` in production (KEYS blocks the server).
+- `MULTI/EXEC` for transactions; use Lua scripts for complex atomic operations.
+- `BITCOUNT`, `HINCRBY` for counters — atomic and efficient.
+- Monitor `slowlog` — O(N) commands with large datasets are problematic.
 
 ### Performance
-- Connection pooling: ioredis gerencia nativamente; use `maxRetriesPerRequest` configurado.
-- Pipelining para batch de comandos — reduz round-trips.
-- `MONITOR` apenas temporariamente — impacto significativo em produção.
+- Connection pooling: ioredis manages natively; use `maxRetriesPerRequest` configured.
+- Pipelining for batch commands — reduces round-trips.
+- `MONITOR` only temporarily — significant impact in production.
 
-### Operações
-- `BGSAVE` para snapshots assíncronos; `LASTSAVE` para verificar.
-- `INFO memory` para monitorar uso de memória.
-- `CLIENT KILL` para desconectar clientes específicos (use com cuidado).
+### Operations
+- `BGSAVE` for async snapshots; `LASTSAVE` to check.
+- `INFO memory` to monitor memory usage.
+- `CLIENT KILL` to disconnect specific clients (use with care).
 
 ---
 
-## Referências detalhadas
+## Detailed References
 
-Leia os arquivos abaixo conforme necessário (não carregue todos de uma vez):
+Read the files below as needed (don't load all at once):
 
-**Schema e tipos:**
-- `references/mysql/primary-keys.md` — design de PKs, UUID vs BIGINT, clustered index
-- `references/mysql/data-types.md` — tipos numéricos, strings, datetime, JSON
-- `references/mysql/character-sets.md` — utf8mb4, collations, migrações
+**Schema and types:**
+- `references/mysql/primary-keys.md` — PK design, UUID vs BIGINT, clustered index
+- `references/mysql/data-types.md` — numeric, string, datetime, JSON types
+- `references/mysql/character-sets.md` — utf8mb4, collations, migrations
 
-**Indexação:**
-- `references/mysql/composite-indexes.md` — regra leftmost prefix, ordem de colunas
+**Indexing:**
+- `references/mysql/composite-indexes.md` — leftmost prefix rule, column order
 - `references/mysql/covering-indexes.md` — index-only scans, EXPLAIN signals
-- `references/mysql/fulltext-indexes.md` — busca textual, BOOLEAN MODE
-- `references/mysql/index-maintenance.md` — índices não usados, redundantes, INVISIBLE
+- `references/mysql/fulltext-indexes.md` — text search, BOOLEAN MODE
+- `references/mysql/index-maintenance.md` — unused, redundant, INVISIBLE indexes
 
 **Queries:**
-- `references/mysql/explain-analysis.md` — tipos de acesso, Extra flags, key_len
-- `references/mysql/query-optimization-pitfalls.md` — predicados não-sargáveis, LIKE, OR
-- `references/mysql/n-plus-one.md` — detecção e correção de N+1, eager loading
-- `references/mysql/json-column-patterns.md` — generated columns, operadores ->>
+- `references/mysql/explain-analysis.md` — access types, Extra flags, key_len
+- `references/mysql/query-optimization-pitfalls.md` — non-sargable predicates, LIKE, OR
+- `references/mysql/n-plus-one.md` — N+1 detection and fix, eager loading
+- `references/mysql/json-column-patterns.md` — generated columns, ->> operators
 
 **Transactions:**
 - `references/mysql/isolation-levels.md` — REPEATABLE READ vs READ COMMITTED
-- `references/mysql/deadlocks.md` — causas comuns, diagnóstico, retry pattern
+- `references/mysql/deadlocks.md` — common causes, diagnosis, retry pattern
 - `references/mysql/row-locking-gotchas.md` — next-key locks, gap locks, FOR UPDATE
 
-**Operações:**
-- `references/mysql/online-ddl.md` — INSTANT/INPLACE/COPY, ferramentas externas
+**Operations:**
+- `references/mysql/online-ddl.md` — INSTANT/INPLACE/COPY, external tools
 - `references/mysql/connection-management.md` — pool sizing, timeouts, ProxySQL
-- `references/mysql/replication-lag.md` — stale reads, GTID, estratégias de mitigação
-- `references/mysql/partitioning.md` — RANGE, LIST, HASH, gestão de partições
+- `references/mysql/replication-lag.md` — stale reads, GTID, mitigation strategies
+- `references/mysql/partitioning.md` — RANGE, LIST, HASH, partition management
 
 **DBeaver:**
-- `references/dbeaver/credentials.md` — como o DBeaver armazena credenciais por OS
-- `references/dbeaver/datasources.md` — estrutura do data-sources.json, campos importantes
-- `references/dbeaver/workspace.md` — caminhos do workspace por OS, versões DBeaver
+- `references/dbeaver/credentials.md` — how DBeaver stores credentials by OS
+- `references/dbeaver/datasources.md` — data-sources.json structure, important fields
+- `references/dbeaver/workspace.md` — workspace paths by OS, DBeaver versions
 
 **PostgreSQL:**
-- `references/postgres/primary-keys.md` — design de PKs, serial, identity, uuid
-- `references/postgres/indexing.md` — tipos de índices, composite indexes, include columns
-- `references/postgres/explain-analysis.md` — leitura de EXPLAIN, red flags
+- `references/postgres/primary-keys.md` — PK design, serial, identity, uuid
+- `references/postgres/indexing.md` — index types, composite indexes, include columns
+- `references/postgres/explain-analysis.md` — reading EXPLAIN, red flags
 - `references/postgres/transactions.md` — isolation levels, locking, MVCC, deadlocks
 - `references/postgres/partitioning.md` — RANGE, LIST, HASH partitioning
 
 **Oracle:**
-- `references/oracle/primary-keys.md` — design de PKs, identity, sequences
-- `references/oracle/indexing.md` — tipos de índices, bitmap, function-based indexes
-- `references/oracle/explain-plan.md` — leitura de EXPLAIN PLAN, red flags
+- `references/oracle/primary-keys.md` — PK design, identity, sequences
+- `references/oracle/indexing.md` — index types, bitmap, function-based indexes
+- `references/oracle/explain-plan.md` — reading EXPLAIN PLAN, red flags
 - `references/oracle/transactions.md` — isolation levels, locking, deadlocks
 - `references/oracle/partitioning.md` — RANGE, LIST, HASH, INTERVAL partitioning
 
 ---
 
-## Permissões
+## Permissions
 
-O servidor suporta controle de permissões via `~/.dbeaver-mcp/settings.json`:
+The server supports permission control via `~/.dbeaver-mcp/settings.json`:
 
 ```json
 {
@@ -302,7 +302,7 @@ O servidor suporta controle de permissões via `~/.dbeaver-mcp/settings.json`:
       "blocked_operations": ["DROP", "TRUNCATE"]
     },
     "connections": {
-      "producao": {
+      "production": {
         "allowed_operations": ["SELECT", "SHOW", "EXPLAIN", "DESCRIBE"]
       },
       "staging": {
@@ -313,57 +313,61 @@ O servidor suporta controle de permissões via `~/.dbeaver-mcp/settings.json`:
 }
 ```
 
-**Lógica de resolução:**
-- Se a conexão tem entry em `connections`, usa as permissões dela (override total)
-- Se não, usa `global`
-- Se não existe `settings.json` ou `permissions`, tudo é permitido (backward-compatible)
-- `allowed_operations` é whitelist — só operações listadas são permitidas
-- `blocked_operations` é blacklist opcional — bloqueia mesmo se não listada explicitamente
+**Permission resolution logic:**
+- If connection has entry in `connections`, uses its permissions (total override)
+- If not, uses `global`
+- If no `settings.json` or `permissions`, everything is allowed (backward-compatible)
+- `allowed_operations` is whitelist — only listed operations are permitted
+- `blocked_operations` is optional blacklist — blocks even if not explicitly whitelisted
 
-**Operações reconhecidas:** `SELECT`, `SHOW`, `EXPLAIN`, `DESCRIBE`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`, `REVOKE`, `FLUSH`, `OPTIMIZE`, `REPAIR`, `USE`, `SET`
+**Recognized operations:** `SELECT`, `SHOW`, `EXPLAIN`, `DESCRIBE`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`, `REVOKE`, `FLUSH`, `OPTIMIZE`, `REPAIR`, `USE`, `SET`
 
 ---
 
 ## Guardrails
 
-- Credenciais nunca trafegam via MCP — gerenciadas exclusivamente pelo DBeaver
-- Nunca logar ou exibir senhas — credenciais ficam apenas em memória
-- Sempre pedir confirmação antes de operações destrutivas (DROP, DELETE sem WHERE, TRUNCATE)
-- Avisar sobre `ALGORITHM=COPY` em tabelas grandes antes de rodar DDL
-- Indicar versão do MySQL quando o comportamento for específico (ex: INSTANT DDL só no 8.0+)
-- Preferir evidências medidas (`EXPLAIN`, `performance_schema`) sobre regras de dedo
-- Nunca expor o conteúdo de `credentials-config.json` — apenas os metadados de conexão
-- Respeitar permissões configuradas em `~/.dbeaver-mcp/settings.json`
+- Credentials never travel via MCP — managed exclusively by DBeaver
+- Never log or display passwords — credentials stay only in memory
+- Always ask for confirmation before destructive operations (DROP, DELETE without WHERE, TRUNCATE)
+- Warn about `ALGORITHM=COPY` on large tables before running DDL
+- Indicate MySQL version when behavior is specific (e.g., INSTANT DDL only in 8.0+)
+- Prefer measured evidence (`EXPLAIN`, `performance_schema`) over rules of thumb
+- Never expose the contents of `credentials-config.json` — only connection metadata
+- Respect permissions configured in `~/.dbeaver-mcp/settings.json`
 
 ---
 
-## Instalação
+## Installation
 
-Instrua o usuário a instalar conforme a preferência:
+### One-time setup
 
-**Opção 1 — Um comando (recomendado):**
+**Step 1: Clone and build**
+
 ```bash
-claude mcp add dbeaver-mcp -- npx dbeaver-mcp
+git clone https://github.com/ALinCheung/dbeaver-mcp.git ~/.claude/skills/dbeaver-mcp
+cd ~/.claude/skills/dbeaver-mcp
+npm install && npm run build
+npm link
 ```
 
-Para registrar globalmente (disponível em todos os projetos):
+**Step 2: Verify installation**
+
 ```bash
-claude mcp add dbeaver-mcp --scope user -- npx dbeaver-mcp
+npx dbeaver-mcp --version
 ```
 
-**Opção 2 — Instalador integrado:**
-```bash
-npx dbeaver-mcp install
-```
-O instalador verifica o workspace DBeaver, cria `~/.dbeaver-mcp/settings.json` e registra no Claude Code automaticamente.
+**Step 3: Register MCP server**
 
-**Opção 3 — Claude Desktop** (`claude_desktop_config.json`):
+Add the following to `~/.claude.json` (Claude Code) or `~/.config/opencode/opencode.json` (OpenCode):
+
 ```json
 {
   "mcpServers": {
     "dbeaver-mcp": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["dbeaver-mcp"]
+      "args": ["dbeaver-mcp"],
+      "env": {}
     }
   }
 }

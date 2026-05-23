@@ -1,13 +1,13 @@
 ---
-title: DBeaver — Armazenamento de Credenciais
-description: Como o DBeaver armazena e criptografa senhas por OS
+title: DBeaver — Credential Storage
+description: How DBeaver stores and encrypts passwords by OS
 ---
 
-# DBeaver — Credenciais por OS
+# DBeaver — Credentials by OS
 
-## Arquivo de credenciais
+## Credential File
 
-`credentials-config.json` no workspace do DBeaver, criptografado com AES-CBC.
+`credentials-config.json` in the DBeaver workspace, encrypted with AES-CBC.
 
 ### macOS
 ```
@@ -23,18 +23,18 @@ description: Como o DBeaver armazena e criptografa senhas por OS
 
 ### Windows
 ```
-%APPDATA%\DBeaverData\workspace6\General\.dbeaver\credentials-config.json
+%APPDATA%\DBeaverData\workspace6/General\.dbeaver\credentials-config.json
 ```
 
-## Criptografia
+## Encryption
 
-- Algoritmo: AES-CBC, chave de 28 bytes (pública, fixa em todas as instalações)
-- IV: 16 bytes nulos
-- Encoding: Base64 após cifrar
+- Algorithm: AES-CBC, 28-byte key (public, fixed across all installations)
+- IV: 16 null bytes
+- Encoding: Base64 after encryption
 
-A chave é conhecida publicamente e documentada em vários projetos open source. O nível de proteção é contra acesso casual, não contra um atacante com acesso ao sistema de arquivos.
+The key is publicly known and documented in several open source projects. The protection level is against casual access, not against an attacker with filesystem access.
 
-## Estrutura do arquivo
+## File Structure
 
 ```json
 {
@@ -47,8 +47,8 @@ A chave é conhecida publicamente e documentada em vários projetos open source.
 }
 ```
 
-## Segurança no dbeaver-mcp
+## Security in dbeaver-mcp
 
-- Senhas são descriptografadas em memória, nunca escritas em disco ou logadas
-- Apenas metadados de conexão (host, porta, banco) são exibidos ao usuário
-- `credentials-config.json` nunca é lido pela skill diretamente — apenas pelo servidor local
+- Passwords are decrypted in memory, never written to disk or logged
+- Only connection metadata (host, port, database) is shown to the user
+- `credentials-config.json` is never read by the skill directly — only by the local server

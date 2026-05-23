@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
+import { getDefaultConnectParams } from "../index.js";
 import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
 import { runPostgresQuery } from "../postgres.js";
@@ -16,7 +17,25 @@ function text(data: unknown) {
 }
 
 /**
- * 根据 driver 类型执行测试查询
+ * Get connection info - tries DBeaver first, falls back to CLI default params
+ */
+function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
+  try {
+    const info = dbeaver.getConnectionInfo(nameOrId);
+    if (info) return info;
+  } catch {
+    // DBeaver workspace not found, fall through to CLI default params
+  }
+
+  const defaultParams = getDefaultConnectParams();
+  if (defaultParams) {
+    return dbeaver.buildConnectionInfo(defaultParams);
+  }
+  return null;
+}
+
+/**
+ * Test connection based on driver type
  */
 async function testConnectionByDriver(
   info: dbeaver.FullConnectionInfo
@@ -41,7 +60,7 @@ async function testConnectionByDriver(
       result = await runOracleQuery(info, "SELECT 1 AS ok FROM DUAL");
       version = "Oracle";
     } else {
-      // MySQL 默认行为
+      // MySQL default
       result = await runMysqlQuery(info, "SELECT 1 AS ok, VERSION() AS version");
       version = result.rows[0]?.version || "";
     }
@@ -55,7 +74,7 @@ async function testConnectionByDriver(
 export function registerConnectionTools(server: McpServer): void {
   server.tool(
     "list_connections",
-    "Lista todas as conexões DBeaver (sem senhas)",
+    "List all DBeaver connections (without passwords)",
     {},
     async () => {
       try {
@@ -69,13 +88,12 @@ export function registerConnectionTools(server: McpServer): void {
 
   server.tool(
     "get_connection",
-    "Retorna detalhes de uma conexão pelo nome",
-    { name: z.string().describe("Nome ou ID da conexão") },
+    "Return connection details by name",
+    { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
         const info = dbeaver.getConnectionInfo(name);
-        if (!info) return text({ error: `Conexão '${name}' não encontrada.` });
-        // Return without password
+        if (!info) return text({ error: `Connection '${name}' not found.` });
         const { password: _, ...safe } = info;
         return text(safe);
       } catch (e: any) {
@@ -86,13 +104,13 @@ export function registerConnectionTools(server: McpServer): void {
 
   server.tool(
     "add_connection",
-    "Adiciona nova conexão ao DBeaver",
+    "Add new connection to DBeaver",
     {
-      name: z.string().describe("Nome da conexão"),
-      host: z.string().describe("Hostname ou IP"),
-      port: z.number().describe("Porta"),
-      database: z.string().describe("Nome do banco de dados"),
-      driver: z.string().optional().default("mysql8").describe("Driver (padrão: mysql8)"),
+      name: z.string().describe("Connection name"),
+      host: z.string().describe("Hostname or IP"),
+      port: z.number().describe("Port"),
+      database: z.string().describe("Database name"),
+      driver: z.string().optional().default("mysql8").describe("Driver (default: mysql8)"),
     },
     async ({ name, host, port, database, driver }) => {
       try {
@@ -106,17 +124,17 @@ export function registerConnectionTools(server: McpServer): void {
 
   server.tool(
     "edit_connection",
-    "Edita host/porta/banco/usuário/senha de uma conexão",
+    "Edit host/port/database/user/password of a connection",
     {
-      name: z.string().describe("Nome ou ID da conexão"),
-      host: z.string().optional().describe("Novo host"),
-      port: z.number().optional().describe("Nova porta"),
-      database: z.string().optional().describe("Novo banco de dados"),
+      name: z.string().describe("Connection name or ID"),
+      host: z.string().optional().describe("New host"),
+      port: z.number().optional().describe("New port"),
+      database: z.string().optional().describe("New database"),
     },
     async ({ name, host, port, database }) => {
       try {
         const ok = dbeaver.editConnection(name, host, port, database);
-        if (!ok) return text({ error: `Conexão '${name}' não encontrada.` });
+        if (!ok) return text({ error: `Connection '${name}' not found.` });
         return text({ success: true, updated: name });
       } catch (e: any) {
         return text({ error: e.message });
@@ -126,12 +144,12 @@ export function registerConnectionTools(server: McpServer): void {
 
   server.tool(
     "remove_connection",
-    "Remove uma conexão do DBeaver",
-    { name: z.string().describe("Nome ou ID da conexão") },
+    "Remove a connection from DBeaver",
+    { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
         const ok = dbeaver.removeConnection(name);
-        if (!ok) return text({ error: `Conexão '${name}' não encontrada.` });
+        if (!ok) return text({ error: `Connection '${name}' not found.` });
         return text({ success: true, removed: name });
       } catch (e: any) {
         return text({ error: e.message });
@@ -141,12 +159,12 @@ export function registerConnectionTools(server: McpServer): void {
 
   server.tool(
     "test_connection",
-    "Testa conectividade de uma conexão",
-    { name: z.string().describe("Nome ou ID da conexão") },
+    "Test connection connectivity",
+    { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
-        const info = dbeaver.getConnectionInfo(name);
-        if (!info) return text({ success: false, error: `Conexão '${name}' não encontrada.` });
+        const info = getConnectionInfo(name);
+        if (!info) return text({ success: false, error: `Connection '${name}' not found.` });
         const permError = checkPermission(name, "SELECT 1");
         if (permError) return text({ success: false, error: permError });
 

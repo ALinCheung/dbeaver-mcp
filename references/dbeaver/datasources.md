@@ -1,37 +1,37 @@
 ---
-title: DBeaver — Estrutura do data-sources.json
-description: Campos e formato do arquivo de conexões do DBeaver
+title: DBeaver — data-sources.json Structure
+description: Fields and format of DBeaver's connection file
 ---
 
 # DBeaver — data-sources.json
 
-## Localização
+## Location
 
-Mesmo diretório do `credentials-config.json`:
+Same directory as `credentials-config.json`:
 ```
 <workspace>/.dbeaver/data-sources.json
 ```
 
-## Estrutura principal
+## Main Structure
 
 ```json
 {
   "connections": {
     "mysql-abc12345": {
-      "name": "Produção MySQL",
+      "name": "Production MySQL",
       "driver": "mysql8",
       "configuration": {
-        "host": "db.exemplo.com",
+        "host": "db.example.com",
         "port": "3306",
         "database": "myapp",
         "user": "appuser",
-        "url": "jdbc:mysql://db.exemplo.com:3306/myapp",
+        "url": "jdbc:mysql://db.example.com:3306/myapp",
         "properties": {
           "useSSL": "true",
           "serverTimezone": "UTC"
         }
       },
-      "folder": "Trabalho",
+      "folder": "Work",
       "readOnly": false,
       "savePassword": true
     }
@@ -39,50 +39,50 @@ Mesmo diretório do `credentials-config.json`:
 }
 ```
 
-## Campos importantes
+## Important Fields
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `name` | string | Nome exibido no DBeaver |
-| `driver` | string | ID do driver (veja abaixo) |
-| `configuration.host` | string | Hostname ou IP |
-| `configuration.port` | string | Porta (como string) |
-| `configuration.database` | string | Banco padrão |
-| `configuration.user` | string | Usuário (pode estar aqui ou em credentials) |
-| `configuration.url` | string | JDBC URL completa (opcional) |
-| `configuration.properties` | object | Propriedades extras do driver |
-| `folder` | string | Pasta organizacional no DBeaver |
-| `savePassword` | bool | Se a senha está salva |
+| `name` | string | Display name in DBeaver |
+| `driver` | string | Driver ID (see below) |
+| `configuration.host` | string | Hostname or IP |
+| `configuration.port` | string | Port (as string) |
+| `configuration.database` | string | Default database |
+| `configuration.user` | string | User (may be here or in credentials) |
+| `configuration.url` | string | Full JDBC URL (optional) |
+| `configuration.properties` | object | Extra driver properties |
+| `folder` | string | Organizational folder in DBeaver |
+| `savePassword` | bool | Whether password is saved |
 
-## Drivers MySQL comuns
+## Common MySQL Drivers
 
-| Driver ID | Versão |
+| Driver ID | Version |
 |---|---|
-| `mysql8` | MySQL 8.x (recomendado) |
+| `mysql8` | MySQL 8.x (recommended) |
 | `mysql5` | MySQL 5.x |
-| `mysql` | Genérico |
+| `mysql` | Generic |
 | `mariadb` | MariaDB |
 
-## ID das conexões
+## Connection IDs
 
-O ID é gerado automaticamente no formato `<driver>-<hex8>`, ex: `mysql-a1b2c3d4`.
-É usado como chave no `credentials-config.json` para vincular as credenciais.
+The ID is auto-generated in format `<driver>-<hex8>`, e.g., `mysql-a1b2c3d4`.
+It is used as key in `credentials-config.json` to link credentials.
 
-## Propriedades úteis do driver MySQL
+## Useful MySQL Driver Properties
 
 ```json
 {
   "useSSL": "true",
   "requireSSL": "false",
   "verifyServerCertificate": "false",
-  "serverTimezone": "America/Sao_Paulo",
+  "serverTimezone": "UTC",
   "allowPublicKeyRetrieval": "true",
   "characterEncoding": "utf8"
 }
 ```
 
-## Notas de compatibilidade
+## Compatibility Notes
 
-- DBeaver 6.x: formato estável, suportado pelo dbeaver-mcp
-- DBeaver 7.x+: mesmo formato, alguns campos extras ignorados pelo dbeaver-mcp
-- O arquivo pode estar em Base64 em algumas versões — o dbeaver.py detecta automaticamente
+- DBeaver 6.x: stable format, supported by dbeaver-mcp
+- DBeaver 7.x+: same format, some extra fields ignored by dbeaver-mcp
+- The file may be Base64 encoded in some versions — dbeaver.py detects automatically

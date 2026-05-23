@@ -74,11 +74,11 @@ export function checkPermission(connectionName: string, sql: string): string | n
   if (connPerms !== undefined) {
     const allowed = new Set((connPerms.allowed_operations || []).map((op) => op.toUpperCase()));
     if (allowed.size > 0 && !allowed.has(keyword)) {
-      return `Operação '${keyword}' não permitida na conexão '${connectionName}'. Operações permitidas: ${[...allowed].sort().join(", ")}`;
+      return `Operation '${keyword}' not allowed on connection '${connectionName}'. Allowed operations: ${[...allowed].sort().join(", ")}`;
     }
     const blocked = new Set((connPerms.blocked_operations || []).map((op) => op.toUpperCase()));
     if (blocked.has(keyword)) {
-      return `Operação '${keyword}' bloqueada na conexão '${connectionName}'.`;
+      return `Operation '${keyword}' blocked on connection '${connectionName}'.`;
     }
     return null;
   }
@@ -89,12 +89,12 @@ export function checkPermission(connectionName: string, sql: string): string | n
 
   const allowed = new Set((globalPerms.allowed_operations || []).map((op) => op.toUpperCase()));
   if (allowed.size > 0 && !allowed.has(keyword)) {
-    return `Operação '${keyword}' não permitida (global). Operações permitidas: ${[...allowed].sort().join(", ")}`;
+    return `Operation '${keyword}' not allowed (global). Allowed operations: ${[...allowed].sort().join(", ")}`;
   }
 
   const blocked = new Set((globalPerms.blocked_operations || []).map((op) => op.toUpperCase()));
   if (blocked.has(keyword)) {
-    return `Operação '${keyword}' bloqueada (global).`;
+    return `Operation '${keyword}' blocked (global).`;
   }
 
   return null;

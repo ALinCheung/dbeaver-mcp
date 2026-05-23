@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
+import { getDefaultConnectParams } from "../index.js";
 import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
 import { runPostgresQuery } from "../postgres.js";
@@ -16,7 +17,25 @@ function text(data: unknown) {
 }
 
 /**
- * 根据 driver 类型执行查询
+ * Get connection info - tries DBeaver first, falls back to CLI default params
+ */
+function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
+  try {
+    const info = dbeaver.getConnectionInfo(nameOrId);
+    if (info) return info;
+  } catch {
+    // DBeaver workspace not found, fall through to CLI default params
+  }
+
+  const defaultParams = getDefaultConnectParams();
+  if (defaultParams) {
+    return dbeaver.buildConnectionInfo(defaultParams);
+  }
+  return null;
+}
+
+/**
+ * Execute query based on driver type
  */
 async function executeQuery(
   info: dbeaver.FullConnectionInfo,
@@ -33,39 +52,38 @@ async function executeQuery(
     return await runOracleQuery(info, sql, params);
   }
 
-  // 默认 MySQL
+  // MySQL default
   return await runMysqlQuery(info, sql);
 }
 
 export function registerSchemaTools(server: McpServer): void {
   server.tool(
     "list_tables",
-    "Lista tabelas de um banco de dados",
+    "List tables in a database",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      database: z.string().optional().describe("Nome do banco (usa o padrão da conexão se omitido)"),
+      connection: z.string().describe("Connection name or ID"),
+      database: z.string().optional().describe("Database name (uses connection default if omitted)"),
     },
     async ({ connection, database }) => {
       try {
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SHOW TABLES");
         if (permError) return text({ error: permError });
         const db = database || info.database;
-        if (!db) return text({ error: "Informe o banco de dados ('database')." });
+        if (!db) return text({ error: "Database name is required." });
 
         const driver = (info.driver || "").toLowerCase();
         let result;
 
         if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
-          // PostgreSQL: 优先使用 information_schema，失败则降级到 pg_tables
+          // PostgreSQL: try information_schema first, fallback to pg_tables
           try {
             result = await executeQuery(info,
               `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`
             );
           } catch (schemaErr: any) {
-            // KingbaseES 等国产数据库可能因权限问题无法访问 information_schema
-            // 降级使用 pg_tables 系统表
+            // KingbaseES and other domestic databases may not have access to information_schema
             result = await executeQuery(info,
               `SELECT tablename as table_name FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
             );
@@ -75,7 +93,7 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "oracle") {
-          // Oracle: 使用 ALL_TABLES
+          // Oracle: use ALL_TABLES
           result = await executeQuery(info,
             `SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = USER AND TEMPORARY = 'N' ORDER BY TABLE_NAME`
           );
@@ -84,7 +102,7 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "redis") {
-          // Redis: 返回键类型统计作为"表"
+          // Redis: return key type statistics as "tables"
           const schema = await getRedisSchema(info as RedisConnectionInfo);
           const tables = ["_overview", ...schema.keys_by_type.map((t) => `keys_${t.type}`)];
           return text({
@@ -96,7 +114,7 @@ export function registerSchemaTools(server: McpServer): void {
           });
         }
 
-        // MySQL 默认行为
+        // MySQL default
         result = await runMysqlQuery(info, `SHOW TABLES FROM \`${db}\``);
         const tables = result.rows.map((r) => Object.values(r)[0]);
         return text({ database: db, tables, total: tables.length });
@@ -108,16 +126,16 @@ export function registerSchemaTools(server: McpServer): void {
 
   server.tool(
     "describe_table",
-    "Descreve estrutura, índices e CREATE TABLE",
+    "Describe table structure, indexes and CREATE TABLE",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      table: z.string().describe("Nome da tabela"),
-      database: z.string().optional().describe("Nome do banco (usa o padrão da conexão se omitido)"),
+      connection: z.string().describe("Connection name or ID"),
+      table: z.string().describe("Table name"),
+      database: z.string().optional().describe("Database name (uses connection default if omitted)"),
     },
     async ({ connection, table, database }) => {
       try {
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "DESCRIBE");
         if (permError) return text({ error: permError });
         const db = database || info.database;
@@ -125,7 +143,7 @@ export function registerSchemaTools(server: McpServer): void {
         const driver = (info.driver || "").toLowerCase();
 
         if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
-          // PostgreSQL: 获取列信息
+          // PostgreSQL: get column info
           const columnsResult = await executeQuery(info,
             `SELECT column_name, data_type, is_nullable, column_default
              FROM information_schema.columns
@@ -134,7 +152,7 @@ export function registerSchemaTools(server: McpServer): void {
             [table]
           );
 
-          // 获取索引信息
+          // Get index info
           const indexesResult = await executeQuery(info,
             `SELECT indexname, indexdef
              FROM pg_indexes
@@ -154,7 +172,7 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "oracle") {
-          // Oracle: 获取列信息
+          // Oracle: get column info
           const columnsResult = await executeQuery(info,
             `SELECT COLUMN_NAME, DATA_TYPE, NULLABLE, DATA_DEFAULT
              FROM ALL_TAB_COLUMNS
@@ -163,7 +181,7 @@ export function registerSchemaTools(server: McpServer): void {
             [table]
           );
 
-          // 获取索引信息
+          // Get index info
           const indexesResult = await executeQuery(info,
             `SELECT INDEX_NAME, INDEX_TYPE, UNIQUENESS
              FROM ALL_INDEXES
@@ -189,7 +207,7 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "redis") {
-          // Redis: 获取键信息
+          // Redis: get key info
           const { runRedisQuery } = await import("../redis.js");
           const keyTypeResult = await runRedisQuery(info as RedisConnectionInfo, `TYPE ${table}`);
           const keyType = keyTypeResult.rows[0]?.type || "none";
@@ -229,7 +247,7 @@ export function registerSchemaTools(server: McpServer): void {
           return text({ key: table, type: keyType, ttl });
         }
 
-        // MySQL 默认行为
+        // MySQL default
         const columns = await runMysqlQuery(info, `DESCRIBE \`${db}\`.\`${table}\``);
         const indexes = await runMysqlQuery(info, `SHOW INDEX FROM \`${db}\`.\`${table}\``);
         const create = await runMysqlQuery(info, `SHOW CREATE TABLE \`${db}\`.\`${table}\``);
@@ -243,15 +261,15 @@ export function registerSchemaTools(server: McpServer): void {
 
   server.tool(
     "explain_query",
-    "Roda EXPLAIN e aponta red flags",
+    "Run EXPLAIN and report red flags",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      sql: z.string().describe("Query SQL para analisar"),
+      connection: z.string().describe("Connection name or ID"),
+      sql: z.string().describe("SQL query to analyze"),
     },
     async ({ connection, sql }) => {
       try {
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "EXPLAIN x");
         if (permError) return text({ error: permError });
 
@@ -263,7 +281,6 @@ export function registerSchemaTools(server: McpServer): void {
         } else if (driver === "oracle") {
           explainSql = `EXPLAIN PLAN SET STATEMENT_ID = 'MCP' FOR ${sql.trim()}`;
         } else if (driver === "redis") {
-          // Redis doesn't support EXPLAIN, return a message
           return text({ error: "Redis does not support EXPLAIN. Use SLOWLOG to monitor slow commands." });
         } else {
           explainSql = `EXPLAIN ${sql.trim()}`;
@@ -272,16 +289,15 @@ export function registerSchemaTools(server: McpServer): void {
         const basic = await executeQuery(info, explainSql);
         const redFlags: string[] = [];
 
-        // 根据数据库类型分析执行计划
+        // Analyze execution plan based on database type
         if (driver === "postgres" || driver === "postgresql" || driver === "postgres-jdbc") {
           for (const row of basic.rows) {
             const plan = JSON.stringify(row).toLowerCase();
-            if (plan.includes("seq scan")) redFlags.push(`全表扫描 (Seq Scan) 检测到`);
-            if (plan.includes("nested loop")) redFlags.push(`嵌套循环连接 (Nested Loop) 可能导致性能问题`);
-            if (plan.includes("hash join")) redFlags.push(`哈希连接 (Hash Join) 使用中`);
+            if (plan.includes("seq scan")) redFlags.push(`Full table scan (Seq Scan) detected`);
+            if (plan.includes("nested loop")) redFlags.push(`Nested loop join may cause performance issues`);
+            if (plan.includes("hash join")) redFlags.push(`Hash join in use`);
           }
         } else if (driver === "oracle") {
-          // Oracle PLAN_TABLE 查询
           const planResult = await executeQuery(info,
             `SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY())`
           );
@@ -291,9 +307,9 @@ export function registerSchemaTools(server: McpServer): void {
           for (const row of basic.rows) {
             const t = row.type || "";
             const extra = row.Extra || "";
-            if (t === "ALL") redFlags.push(`全表扫描在表 '${row.table || ""}'`);
-            if (extra.includes("Using filesort")) redFlags.push(`Using filesort 在表 '${row.table || ""}'`);
-            if (extra.includes("Using temporary")) redFlags.push(`Using temporary 在表 '${row.table || ""}'`);
+            if (t === "ALL") redFlags.push(`Full table scan on table '${row.table || ""}'`);
+            if (extra.includes("Using filesort")) redFlags.push(`Using filesort on table '${row.table || ""}'`);
+            if (extra.includes("Using temporary")) redFlags.push(`Using temporary on table '${row.table || ""}'`);
           }
         }
 
@@ -306,14 +322,14 @@ export function registerSchemaTools(server: McpServer): void {
 
   server.tool(
     "show_processlist",
-    "Mostra queries em execução no servidor",
+    "Show running queries on the server",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
+      connection: z.string().describe("Connection name or ID"),
     },
     async ({ connection }) => {
       try {
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SHOW PROCESSLIST");
         if (permError) return text({ error: permError });
 
@@ -336,13 +352,12 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "redis") {
-          // Redis: use CLIENT LIST for connection info
           const { runRedisQuery } = await import("../redis.js");
           const result = await runRedisQuery(info as RedisConnectionInfo, "CLIENT LIST");
           return text({ client_list: result.rows });
         }
 
-        // MySQL 默认行为
+        // MySQL default
         const result = await runMysqlQuery(info, "SHOW FULL PROCESSLIST");
         return text(result);
       } catch (e: any) {
@@ -353,15 +368,15 @@ export function registerSchemaTools(server: McpServer): void {
 
   server.tool(
     "show_slow_queries",
-    "Lista queries lentas do performance_schema",
+    "List slow queries from performance_schema",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      limit: z.number().optional().default(20).describe("Número máximo de resultados"),
+      connection: z.string().describe("Connection name or ID"),
+      limit: z.number().optional().default(20).describe("Maximum number of results"),
     },
     async ({ connection, limit }) => {
       try {
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SELECT FROM performance_schema");
         if (permError) return text({ error: permError });
 
@@ -389,13 +404,12 @@ export function registerSchemaTools(server: McpServer): void {
         }
 
         if (driver === "redis") {
-          // Redis: use SLOWLOG for slow commands
           const { runRedisQuery } = await import("../redis.js");
           const result = await runRedisQuery(info as RedisConnectionInfo, `SLOWLOG GET ${limit}`);
           return text({ slowlog: result.rows });
         }
 
-        // MySQL 默认行为
+        // MySQL default
         const sql = `
           SELECT digest_text, count_star, avg_timer_wait/1e12 AS avg_sec,
                  max_timer_wait/1e12 AS max_sec, sum_rows_examined

@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
+import { getDefaultConnectParams } from "../index.js";
 import { extractSqlKeyword, checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery, runWrite as runMysqlWrite } from "../mysql.js";
 import { runPostgresQuery, runPostgresWrite, isPostgresWriteOperation } from "../postgres.js";
@@ -20,7 +21,26 @@ function text(data: unknown) {
 }
 
 /**
- * 根据 driver 类型判断是否为写操作
+ * Get connection info - tries DBeaver first, falls back to CLI default params
+ */
+function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
+  try {
+    const info = dbeaver.getConnectionInfo(nameOrId);
+    if (info) return info;
+  } catch {
+    // DBeaver workspace not found, fall through to CLI default params
+  }
+
+  // Fall back to CLI default params
+  const defaultParams = getDefaultConnectParams();
+  if (defaultParams) {
+    return dbeaver.buildConnectionInfo(defaultParams);
+  }
+  return null;
+}
+
+/**
+ * Check if operation is a write operation based on driver type
  */
 function isWriteOperation(driver: string, query: string): boolean {
   const d = driver.toLowerCase();
@@ -33,13 +53,13 @@ function isWriteOperation(driver: string, query: string): boolean {
   if (d === "oracle") {
     return isOracleWriteOperation(query);
   }
-  // MySQL 默认行为
+  // MySQL default
   const keyword = extractSqlKeyword(query);
   return WRITE_KEYWORDS.has(keyword);
 }
 
 /**
- * 根据 driver 类型执行查询
+ * Execute query based on driver type
  */
 async function executeQuery(
   info: dbeaver.FullConnectionInfo,
@@ -59,12 +79,12 @@ async function executeQuery(
     return await runOracleQuery(info, sql);
   }
 
-  // 默认 MySQL
+  // MySQL default
   return await runMysqlQuery(info, sql);
 }
 
 /**
- * 根据 driver 类型执行写操作
+ * Execute write operation based on driver type
  */
 async function executeWrite(
   info: dbeaver.FullConnectionInfo,
@@ -84,17 +104,17 @@ async function executeWrite(
     return await runOracleWrite(info, sql);
   }
 
-  // 默认 MySQL
+  // MySQL default
   return await runMysqlWrite(info, sql);
 }
 
 export function registerQueryTools(server: McpServer): void {
   server.tool(
     "run_query",
-    "Executa SELECT/SHOW/EXPLAIN (somente leitura)",
+    "Execute SELECT/SHOW/EXPLAIN (read-only)",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      sql: z.string().describe("Query SQL (somente leitura)"),
+      connection: z.string().describe("Connection name or ID"),
+      sql: z.string().describe("SQL query (read-only)"),
     },
     async ({ connection, sql }) => {
       try {
@@ -102,11 +122,11 @@ export function registerQueryTools(server: McpServer): void {
         const permError = checkPermission(connection, trimmed);
         if (permError) return text({ error: permError });
 
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
 
         if (isWriteOperation(info.driver, trimmed)) {
-          return text({ error: `Use run_write para operações de escrita. run_query é somente leitura.` });
+          return text({ error: `Use run_write for write operations. run_query is read-only.` });
         }
 
         const result = await executeQuery(info, trimmed);
@@ -119,11 +139,11 @@ export function registerQueryTools(server: McpServer): void {
 
   server.tool(
     "run_write",
-    "Executa INSERT/UPDATE/DELETE/DDL (requer confirmação)",
+    "Execute INSERT/UPDATE/DELETE/DDL (requires confirmation)",
     {
-      connection: z.string().describe("Nome ou ID da conexão"),
-      sql: z.string().describe("Query SQL de escrita"),
-      confirmed: z.boolean().optional().default(false).describe("Confirmar execução"),
+      connection: z.string().describe("Connection name or ID"),
+      sql: z.string().describe("Write SQL query"),
+      confirmed: z.boolean().optional().default(false).describe("Confirm execution"),
     },
     async ({ connection, sql, confirmed }) => {
       try {
@@ -134,13 +154,13 @@ export function registerQueryTools(server: McpServer): void {
         if (!confirmed) {
           return text({
             requires_confirmation: true,
-            message: `Confirme a execução da operação de escrita na conexão '${connection}'.`,
+            message: `Confirm execution of write operation on connection '${connection}'.`,
             sql_preview: trimmed.slice(0, 300),
           });
         }
 
-        const info = dbeaver.getConnectionInfo(connection);
-        if (!info) return text({ error: `Conexão '${connection}' não encontrada.` });
+        const info = getConnectionInfo(connection);
+        if (!info) return text({ error: `Connection '${connection}' not found.` });
 
         const result = await executeWrite(info, trimmed);
         return text(result);

@@ -1,32 +1,33 @@
 # dbeaver-mcp
 
-MCP server que expõe conexões DBeaver ao Claude como tools. Lê credenciais criptografadas do DBeaver em memória — nunca persiste senhas em disco.
+MCP server that exposes DBeaver connections to Claude as tools. Reads encrypted credentials from DBeaver in memory — never persists passwords to disk.
 
-## Estrutura
+## Structure
 
 ```
 dbeaver-mcp/
 ├── src/
 │   ├── index.ts            # Entry point: MCP server setup + stdio transport
-│   ├── dbeaver.ts          # Core: ler configs DBeaver, crypto AES-128-CBC, CRUD conexões
-│   ├── permissions.ts      # Carregar settings.json, check de permissão por conexão
-│   ├── mysql.ts            # Wrappers de conexão e execução de queries (mysql2)
-│   ├── postgres.ts         # Wrappers de conexão e execução de queries (pg)
-│   ├── oracle.ts           # Wrappers de conexão e execução de queries (oracledb)
-│   ├── redis.ts            # Wrappers de conexão e execução de queries (ioredis)
+│   ├── dbeaver.ts          # Core: read DBeaver configs, crypto AES-128-CBC, CRUD connections
+│   ├── cli.ts              # CLI dispatcher with direct connect mode support
+│   ├── permissions.ts      # Load settings.json, check permission by connection
+│   ├── mysql.ts            # Connection and query execution wrappers (mysql2)
+│   ├── postgres.ts         # Connection and query execution wrappers (pg)
+│   ├── oracle.ts           # Connection and query execution wrappers (oracledb)
+│   ├── redis.ts            # Connection and query execution wrappers (ioredis)
 │   └── tools/
 │       ├── connections.ts  # Tools: list, get, add, edit, remove, test connection
 │       ├── queries.ts      # Tools: run_query, run_write
 │       └── schema.ts       # Tools: list_tables, describe_table, explain, processlist, slow queries
-├── dist/                   # JS compilado (gitignored)
-├── install/                # Scripts de instalação por OS
-├── references/             # Docs de referência DBeaver + MySQL + PostgreSQL + Oracle
-├── package.json            # NPX-ready com bin field
+├── dist/                   # Compiled JS (gitignored)
+├── install/                # Installation scripts by OS
+├── references/             # Reference docs for DBeaver + MySQL + PostgreSQL + Oracle
+├── package.json            # NPX-ready with bin field
 ├── tsconfig.json           # TypeScript config
-└── settings.example.json   # Exemplo de permissões
+└── settings.example.json   # Permission example
 ```
 
-## Dependências
+## Dependencies
 
 ```bash
 npm install
@@ -38,89 +39,151 @@ npm install
 npm run build
 ```
 
-## Rodar o servidor
+## Run the server
 
 ```bash
 node dist/index.js
 ```
 
-O servidor usa protocolo MCP via stdio (JSON-RPC 2.0).
+The server uses MCP protocol via stdio (JSON-RPC 2.0).
 
-## Bancos de dados suportados
+## Supported Databases
 
-| Driver | Banco | Pacote |
-|--------|-------|--------|
+| Driver | Database | Package |
+|--------|---------|---------|
 | `mysql8`, `mysql5`, `mariadb` | MySQL 5.x/8.x, MariaDB | mysql2/promise |
 | `postgres`, `postgresql`, `postgres-jdbc` | PostgreSQL | pg |
 | `oracle` | Oracle | oracledb |
 | `redis` | Redis | ioredis |
 
-## Registrar no Claude Code
+## Direct Connect Mode
+
+When DBeaver is not installed, use CLI arguments to connect directly:
 
 ```bash
-claude mcp add dbeaver-mcp -- npx dbeaver-mcp
+npx dbeaver-mcp --host <host> --username <user> --password <pass> --database <db> [--driver mysql8] [--port <port>]
 ```
 
-## Registrar no Claude Desktop
+Supported CLI arguments:
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--host` | `-h` | Database host |
+| `--port` | `-p` | Port |
+| `--username` | `-u` | Username (Redis 不需要) |
+| `--password` | `-P` | Password |
+| `--database` | `-d` | Database name |
+| `--driver` | `-D` | Driver type (default: mysql8) |
+
+Supported drivers: `mysql8`, `mysql5`, `mariadb`, `postgres`, `postgresql`, `postgres-jdbc`, `oracle`, `redis`
+
+**Note**: Redis 连接不需要 `--username` 参数。
+
+Example MCP server configuration:
 
 ```json
 {
   "mcpServers": {
     "dbeaver-mcp": {
       "command": "npx",
-      "args": ["dbeaver-mcp"]
+      "args": [
+        "dbeaver-mcp",
+        "--host", "192.168.1.100",
+        "--port", "3306",
+        "--username", "admin",
+        "--password", "secret",
+        "--database", "mydb",
+        "--driver", "mysql8"
+      ]
     }
   }
 }
 ```
 
-## Tools disponíveis
+Redis 配置示例：
 
-| Tool | Descrição |
+```json
+{
+  "mcpServers": {
+    "dbeaver-mcp-redis": {
+      "command": "npx",
+      "args": [
+        "dbeaver-mcp",
+        "--host", "192.168.1.100",
+        "--port", "6379",
+        "--password", "redis_password",
+        "--database", "0",
+        "--driver", "redis"
+      ]
+    }
+  }
+}
+```
+
+## Register in Claude Code
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "dbeaver-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["dbeaver-mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+## Available Tools
+
+| Tool | Description |
 |---|---|
-| `list_connections` | Lista conexões DBeaver (sem senhas) |
-| `get_connection` | Retorna detalhes de uma conexão pelo nome |
-| `add_connection` | Adiciona nova conexão (suporta mysql8, mysql5, mariadb, postgres, oracle, redis) |
-| `edit_connection` | Edita host/porta/banco (credenciais via DBeaver) |
-| `remove_connection` | Remove uma conexão |
-| `test_connection` | Testa conectividade |
-| `run_query` | SELECT/SHOW/EXPLAIN (somente leitura) |
-| `run_write` | INSERT/UPDATE/DELETE/DDL (requer confirmação) |
-| `list_tables` | Lista tabelas de um banco |
-| `describe_table` | Estrutura, índices e CREATE TABLE |
-| `explain_query` | EXPLAIN com análise de red flags |
-| `show_processlist` | Queries em execução |
-| `show_slow_queries` | Queries lentas (usa views específicas do banco) |
+| `list_connections` | List all DBeaver connections (without passwords) |
+| `get_connection` | Get connection details by name |
+| `add_connection` | Add new connection (supports mysql8, mysql5, mariadb, postgres, oracle, redis) |
+| `edit_connection` | Edit host/port/database (credentials via DBeaver) |
+| `remove_connection` | Remove a connection |
+| `test_connection` | Test connection connectivity |
+| `run_query` | SELECT/SHOW/EXPLAIN (read-only) |
+| `run_write` | INSERT/UPDATE/DELETE/DDL (requires confirmation) |
+| `list_tables` | List tables in a database |
+| `describe_table` | Structure, indexes and CREATE TABLE |
+| `explain_query` | EXPLAIN with red flag analysis |
+| `show_processlist` | Running queries on server |
+| `show_slow_queries` | Slow queries (uses database-specific views) |
 
-## Permissões
+## Permissions
 
-O sistema suporta controle de permissões via `~/.dbeaver-mcp/settings.json`:
+The system supports permission control via `~/.dbeaver-mcp/settings.json`:
 
-- **Global** — define operações SQL permitidas por padrão
-- **Por conexão** — override das permissões globais para conexões específicas
+- **Global** — defines SQL operations allowed by default
+- **Per connection** — overrides global permissions for specific connections
 
-Lógica de resolução: conexão específica → global → tudo permitido (backward-compatible).
+Resolution logic: connection-specific → global → everything allowed (backward-compatible).
 
-Veja `settings.example.json` para exemplo de configuração.
+See `settings.example.json` for configuration example.
 
-## Segurança
+## Security
 
-- Senhas descriptografadas em memória, nunca logadas
-- `credentials-config.json` e `data-sources.json` estão no `.gitignore`
-- `run_write` exige `confirmed: true` antes de executar
-- `run_query` bloqueia INSERT/UPDATE/DELETE/DROP (para todos os bancos)
-- Permissões configuráveis por conexão via `~/.dbeaver-mcp/settings.json`
-- Oracle: detecta MERGE, PL/SQL blocks como operações de escrita
+- Decrypted passwords held in memory only, never logged
+- `credentials-config.json` and `data-sources.json` are in `.gitignore`
+- `run_write` requires `confirmed: true` before executing
+- `run_query` blocks INSERT/UPDATE/DELETE/DROP (for all databases)
+- Permissions configurable per connection via `~/.dbeaver-mcp/settings.json`
+- Oracle: detects MERGE and PL/SQL blocks as write operations
 
-## Caminhos do workspace DBeaver por OS
+## DBeaver Workspace Paths by OS
 
-| OS | Caminho |
+| OS | Path |
 |---|---|
 | macOS | `~/Library/DBeaverData/workspace6/General/.dbeaver/` |
 | Linux | `~/.local/share/DBeaverData/workspace6/General/.dbeaver/` |
 | Windows | `%APPDATA%\DBeaverData\workspace6\General\.dbeaver\` |
 
-## Testar sem Claude
+## Test without Claude
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}
