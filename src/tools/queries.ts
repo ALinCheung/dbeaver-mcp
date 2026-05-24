@@ -26,7 +26,16 @@ function text(data: unknown) {
 function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
   try {
     const info = dbeaver.getConnectionInfo(nameOrId);
-    if (info) return info;
+    if (info) {
+      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
+      if (!info.password) {
+        const defaultParams = getDefaultConnectParams();
+        if (defaultParams?.password) {
+          return dbeaver.buildConnectionInfo(defaultParams);
+        }
+      }
+      return info;
+    }
   } catch {
     // DBeaver workspace not found, fall through to CLI default params
   }

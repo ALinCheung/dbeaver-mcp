@@ -60,6 +60,8 @@ export async function redisConnect(info: RedisConnectionInfo): Promise<Redis> {
     db: parseInt(info.database, 10) || 0,
     connectTimeout: 10000,
     lazyConnect: true,
+    retryStrategy: () => null,   // 禁用自动重连，防止旧实例干扰新连接
+    enableOfflineQueue: false,   // 禁用离线队列，确保立即反馈错误
   });
 
   await redis.connect();
@@ -231,7 +233,9 @@ export async function runRedisQuery(
     }
     return { columns: ["result"], rows: [{ result: String(result) }], rowcount: 1 };
   } finally {
-    await redis.quit();
+    // 使用 disconnect(true) 立即强制关闭连接，不等待 QUIT 确认
+    // disconnect(false) 会等待 2s 清理期，可能与新连接冲突
+    redis.disconnect(true);
   }
 }
 
@@ -319,7 +323,7 @@ export async function runRedisWrite(
     const rowcount = typeof result === "number" ? result : (result === "OK" ? 1 : 0);
     return { rowcount, lastrowid: null };
   } finally {
-    await redis.quit();
+    redis.disconnect(true);
   }
 }
 
@@ -378,6 +382,6 @@ export async function getRedisSchema(
 
     return { overview, keys_by_type };
   } finally {
-    await redis.quit();
+    redis.disconnect(true);
   }
 }

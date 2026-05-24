@@ -9,7 +9,8 @@ dbeaver-mcp/
 ├── src/
 │   ├── index.ts            # Entry point: MCP server setup + stdio transport
 │   ├── dbeaver.ts          # Core: read DBeaver configs, crypto AES-128-CBC, CRUD connections
-│   ├── cli.ts              # CLI dispatcher with direct connect mode support
+│   ├── cli-auto.ts         # CLI 入口：自动模式（默认），从 DBeaver 读取连接
+│   ├── cli-direct.ts        # CLI 入口：直连模式，通过 CLI 参数连接数据库
 │   ├── permissions.ts      # Load settings.json, check permission by connection
 │   ├── mysql.ts            # Connection and query execution wrappers (mysql2)
 │   ├── postgres.ts         # Connection and query execution wrappers (pg)
@@ -58,62 +59,84 @@ The server uses MCP protocol via stdio (JSON-RPC 2.0).
 
 ## Direct Connect Mode
 
-When DBeaver is not installed, use CLI arguments to connect directly:
+When DBeaver is not installed, use `database-mcp` command to connect directly:
 
 ```bash
-npx dbeaver-mcp --host <host> --username <user> --password <pass> --database <db> [--driver mysql8] [--port <port>]
+npx database-mcp --host <host> --username <user> --password <pass> --database <db> --name <connection-name> [--driver mysql8] [--port <port>]
 ```
+
+**Note**: `--name` is required for direct mode to identify the connection (shown in `list_connections`).
 
 Supported CLI arguments:
 
 | Argument | Short | Description |
 |----------|-------|-------------|
-| `--host` | `-h` | Database host |
-| `--port` | `-p` | Port |
-| `--username` | `-u` | Username (Redis 不需要) |
-| `--password` | `-P` | Password |
-| `--database` | `-d` | Database name |
+| `--host` | `-h` | Database host (required) |
+| `--port` | `-p` | Port (optional, auto-detected by driver) |
+| `--username` | `-u` | Username (not required for Redis) |
+| `--password` | `-P` | Password (required) |
+| `--database` | `-d` | Database name (required) |
 | `--driver` | `-D` | Driver type (default: mysql8) |
+| `--name` | `-n` | Connection name (required) |
 
 Supported drivers: `mysql8`, `mysql5`, `mariadb`, `postgres`, `postgresql`, `postgres-jdbc`, `oracle`, `redis`
 
 **Note**: Redis 连接不需要 `--username` 参数。
 
-Example MCP server configuration:
+Example MCP server configuration for auto mode:
 
 ```json
 {
   "mcpServers": {
     "dbeaver-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["dbeaver-mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+Example MCP server configuration for direct mode:
+
+```json
+{
+  "mcpServers": {
+    "database-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": [
-        "dbeaver-mcp",
+        "database-mcp",
         "--host", "192.168.1.100",
         "--port", "3306",
         "--username", "admin",
         "--password", "secret",
         "--database", "mydb",
-        "--driver", "mysql8"
+        "--driver", "mysql8",
+        "--name", "my-mysql"
       ]
     }
   }
 }
 ```
 
-Redis 配置示例：
+Redis configuration example:
 
 ```json
 {
   "mcpServers": {
-    "dbeaver-mcp-redis": {
+    "database-mcp-redis": {
+      "type": "stdio",
       "command": "npx",
       "args": [
-        "dbeaver-mcp",
+        "database-mcp",
         "--host", "192.168.1.100",
         "--port", "6379",
         "--password", "redis_password",
         "--database", "0",
-        "--driver", "redis"
+        "--driver", "redis",
+        "--name", "my-redis"
       ]
     }
   }

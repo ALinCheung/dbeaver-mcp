@@ -22,7 +22,17 @@ function text(data: unknown) {
 function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
   try {
     const info = dbeaver.getConnectionInfo(nameOrId);
-    if (info) return info;
+    if (info) {
+      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
+      if (!info.password) {
+        const defaultParams = getDefaultConnectParams();
+        if (defaultParams?.password) {
+          // DBeaver connection found but no password — use CLI password from defaultParams
+          return dbeaver.buildConnectionInfo(defaultParams);
+        }
+      }
+      return info;
+    }
   } catch {
     // DBeaver workspace not found, fall through to CLI default params
   }
@@ -49,7 +59,7 @@ async function testConnectionByDriver(
     if (driver === "redis") {
       const redis = await redisConnect(info as any);
       version = await redis.ping();
-      await redis.quit();
+      redis.disconnect(true);
       return { success: true, version: `Redis ${version}` };
     }
 
@@ -79,8 +89,42 @@ export function registerConnectionTools(server: McpServer): void {
     async () => {
       try {
         const connections = dbeaver.listConnectionsSafe();
+
+        // Add direct mode connection if in direct mode
+        const defaultParams = getDefaultConnectParams();
+        if (defaultParams) {
+          const directConn = dbeaver.buildConnectionInfo(defaultParams);
+          // Avoid duplicates
+          if (!connections.some(c => c.id === directConn.id)) {
+            connections.unshift({
+              id: directConn.id,
+              name: directConn.name,
+              driver: directConn.driver,
+              host: directConn.host,
+              port: directConn.port,
+              database: directConn.database,
+            });
+          }
+        }
+
         return text({ connections, total: connections.length });
       } catch (e: any) {
+        // If DBeaver workspace not found, only show direct mode connection if available
+        const defaultParams = getDefaultConnectParams();
+        if (defaultParams) {
+          const directConn = dbeaver.buildConnectionInfo(defaultParams);
+          return text({
+            connections: [{
+              id: directConn.id,
+              name: directConn.name,
+              driver: directConn.driver,
+              host: directConn.host,
+              port: directConn.port,
+              database: directConn.database,
+            }],
+            total: 1,
+          });
+        }
         return text({ error: e.message });
       }
     },
@@ -92,7 +136,7 @@ export function registerConnectionTools(server: McpServer): void {
     { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
-        const info = dbeaver.getConnectionInfo(name);
+        const info = getConnectionInfo(name);
         if (!info) return text({ error: `Connection '${name}' not found.` });
         const { password: _, ...safe } = info;
         return text(safe);

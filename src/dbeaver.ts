@@ -37,6 +37,7 @@ export interface ConnectParams {
   password: string;
   database: string;
   driver?: string;
+  name?: string;
 }
 
 // Driver -> default port mapping
@@ -53,7 +54,7 @@ export function buildConnectionInfo(params: ConnectParams): FullConnectionInfo {
   const port = params.port || DRIVER_DEFAULT_PORTS[driver] || 3306;
   return {
     id: `direct-${driver}-${Date.now()}`,
-    name: `direct:${params.host}:${port}/${params.database}`,
+    name: params.name || `direct:${params.host}:${port}/${params.database}`,
     driver,
     host: params.host,
     port: String(port),

@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 /**
- * cli.ts — CLI dispatcher for dbeaver-mcp.
- * Supports CLI args for direct connection mode: --host, --port, --username, --password, --database, --driver
+ * cli-direct.ts — CLI 入口：直连模式
+ * 通过 CLI 参数直接连接数据库，无需 DBeaver
+ *
+ * 支持子命令：
+ *   install   - 运行安装流程
+ *   --help    - 显示帮助
+ *   --version - 显示版本
+ *   (default) - 以直连模式启动 MCP server
  */
 
 import { createRequire } from "node:module";
@@ -20,6 +26,7 @@ interface CliArgs {
   password?: string;
   database?: string;
   driver?: string;
+  name?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -28,6 +35,8 @@ function parseArgs(argv: string[]): CliArgs {
     const arg = argv[i];
     switch (arg) {
       case "--host":
+        args.host = argv[++i];
+        break;
       case "-h":
         args.host = argv[++i];
         break;
@@ -51,6 +60,10 @@ function parseArgs(argv: string[]): CliArgs {
       case "-D":
         args.driver = argv[++i];
         break;
+      case "--name":
+      case "-n":
+        args.name = argv[++i];
+        break;
     }
   }
   return args;
@@ -66,7 +79,6 @@ function validateArgs(args: CliArgs): string | null {
   if (args.username !== undefined && args.username.trim() === "") {
     return "error: --username must be provided";
   }
-  // 直接连接模式（提供了 host）时才要求 username
   if (args.host !== undefined && args.username === undefined && args.driver !== "redis") {
     return "error: --username must be provided";
   }
@@ -78,6 +90,13 @@ function validateArgs(args: CliArgs): string | null {
   }
   if (args.driver !== undefined && !VALID_DRIVERS.includes(args.driver)) {
     return `error: --driver must be one of: ${VALID_DRIVERS.join(", ")}`;
+  }
+  // --name is required for direct mode to identify the connection
+  if (args.name !== undefined && args.name.trim() === "") {
+    return "error: --name must be provided";
+  }
+  if (args.host !== undefined && args.name === undefined) {
+    return "error: --name must be provided (required for direct mode)";
   }
   return null;
 }
@@ -93,19 +112,29 @@ switch (command) {
 
   case "--help":
   case "-h":
-    console.log(`dbeaver-mcp — MCP server exposing DBeaver connections to Claude
+    console.log(`database-mcp — Direct database connection MCP server (no DBeaver required)
 
 Usage:
-  npx dbeaver-mcp            Start the MCP server (stdio)
-  npx dbeaver-mcp install    Setup: verify DBeaver, create config, register in Claude
-  npx dbeaver-mcp --help     Show this help
-  npx dbeaver-mcp --version  Show version
+  npx database-mcp --host <host> --username <user> --password <pass> --database <db> [--driver mysql8] [--port <port>] [--name <connection-name>]
 
-Direct connection mode (without DBeaver):
-  npx dbeaver-mcp --host <host> --username <user> --password <pass> --database <db> [--driver mysql8] [--port <port>]
-  npx dbeaver-mcp -h <host> -u <user> -P <pass> -d <db> [-D mysql8] [-p <port>]
+Supported drivers: ${VALID_DRIVERS.join(", ")}
 
-Supported drivers: ${VALID_DRIVERS.join(", ")}`);
+Arguments:
+  --host     Database host (required)
+  --port     Port (optional, auto-detected by driver)
+  --username Username (not required for Redis)
+  --password Password (required)
+  --database Database name (required)
+  --driver   Driver type: mysql8, mysql5, mariadb, postgres, postgresql, postgres-jdbc, oracle, redis (default: mysql8)
+  --name     Connection name for identification in list_connections (required)
+
+Examples:
+  npx database-mcp --host localhost --username root --password secret --database test --name my-mysql
+  npx database-mcp --host pgserver --port 5432 --username pguser --password pgpass --database mydb --driver postgres --name my-postgres
+  npx database-mcp --host redis-host --password redis_password --database 0 --driver redis --name my-redis
+
+Short form:
+  npx database-mcp -h <host> -u <user> -P <pass> -d <db> [-D mysql8] [-p <port>] [-n <name>]`);
     break;
 
   case "--version":
@@ -117,7 +146,6 @@ Supported drivers: ${VALID_DRIVERS.join(", ")}`);
   }
 
   default: {
-    // Parse CLI args for direct connection mode
     const cliArgs = parseArgs(process.argv);
     const validationError = validateArgs(cliArgs);
     if (validationError) {
