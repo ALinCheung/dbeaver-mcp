@@ -125,6 +125,47 @@ Add the following to `~/.claude.json` (Claude Code) or `~/.config/opencode/openc
 
 ### Direct Connect Mode
 
+When DBeaver is not installed, use `database-mcp` to connect directly:
+
+```bash
+npx database-mcp --host <host> --username <user> --password <pass> --database <db> --name <connection-name> [--driver mysql8] [--port <port>]
+```
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--host` | `-h` | Database host (required) |
+| `--port` | `-p` | Port (optional, auto-detected by driver) |
+| `--username` | `-u` | Username (not required for Redis) |
+| `--password` | `-P` | Password (required) |
+| `--database` | `-d` | Database name (required) |
+| `--driver` | `-D` | Driver type (default: mysql8) |
+| `--name` | `-n` | Connection name (required) |
+
+Supported drivers: `mysql8`, `mysql5`, `mariadb`, `postgres`, `postgresql`, `postgres-jdbc`, `oracle`, `redis`
+
+Example MCP server configuration for direct mode:
+
+```json
+{
+  "mcpServers": {
+    "database-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "database-mcp",
+        "--host", "192.168.1.100",
+        "--port", "3306",
+        "--username", "admin",
+        "--password", "secret",
+        "--database", "mydb",
+        "--driver", "mysql8",
+        "--name", "my-mysql"
+      ]
+    }
+  }
+}
+```
+
 ## Available Tools
 
 ### Connection Management
@@ -222,7 +263,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 dbeaver-mcp/
 ├── src/
 │   ├── index.ts            # MCP server entry point (stdio transport)
-│   ├── cli.ts              # CLI dispatcher (install, --help, --version, or start server)
+│   ├── cli-auto.ts         # CLI entry: auto mode (reads from DBeaver)
+│   ├── cli-direct.ts        # CLI entry: direct connect mode (CLI args, no DBeaver required)
 │   ├── dbeaver.ts          # Core: read/write DBeaver configs, AES-128-CBC crypto
 │   ├── permissions.ts      # Permission system (global + per-connection)
 │   ├── mysql.ts            # MySQL connection and query execution (mysql2)

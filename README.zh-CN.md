@@ -121,42 +121,42 @@ npx dbeaver-mcp --version
 
 ### 直连模式
 
-当没有安装 DBeaver 时，可以使用 CLI 参数直接连接数据库：
+当没有安装 DBeaver 时，使用 `database-mcp` 命令直接连接数据库：
 
 ```bash
-npx dbeaver-mcp --host <host> --user <user> --password <pass> --database <db> [--driver mysql8] [--port <port>]
+npx database-mcp --host <host> --username <user> --password <pass> --database <db> --name <connection-name> [--driver mysql8] [--port <port>]
 ```
 
 支持的 CLI 参数：
 
 | 参数 | 缩写 | 说明 |
 |------|------|------|
-| `--host` | `-h` | 数据库地址 |
-| `--port` | `-p` | 端口 |
-| `--user` | `-u` | 用户名 |
-| `--password` | `-P` | 密码 |
-| `--database` | `-d` | 数据库名 |
+| `--host` | `-h` | 数据库地址（必需） |
+| `--port` | `-p` | 端口（可选，根据驱动自动检测） |
+| `--username` | `-u` | 用户名（Redis 不需要） |
+| `--password` | `-P` | 密码（必需） |
+| `--database` | `-d` | 数据库名（必需） |
 | `--driver` | `-D` | 驱动类型（默认：mysql8） |
-
-## 可用工具 |
+| `--name` | `-n` | 连接名称（必需） |
 
 支持的驱动类型：`mysql8`, `mysql5`, `mariadb`, `postgres`, `postgresql`, `postgres-jdbc`, `oracle`, `redis`
 
-**MCP Server 配置示例：**
+**MCP Server 配置示例（直连模式）：**
 
 ```json
 {
   "mcpServers": {
-    "dbeaver-mcp": {
+    "database-mcp": {
       "command": "npx",
       "args": [
-        "dbeaver-mcp",
+        "database-mcp",
         "--host", "192.168.1.100",
         "--port", "3306",
-        "--user", "admin",
+        "--username", "admin",
         "--password", "secret",
         "--database", "mydb",
-        "--driver", "mysql8"
+        "--driver", "mysql8",
+        "--name", "my-mysql"
       ]
     }
   }
@@ -260,7 +260,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 dbeaver-mcp/
 ├── src/
 │   ├── index.ts            # MCP 服务器入口（stdio 传输）
-│   ├── cli.ts              # CLI 调度器（install、--help、--version 或启动服务器）
+│   ├── cli-auto.ts         # CLI 入口：自动模式（从 DBeaver 读取连接）
+│   ├── cli-direct.ts        # CLI 入口：直连模式（CLI 参数连接，无需 DBeaver）
 │   ├── dbeaver.ts          # 核心：读取/写入 DBeaver 配置、AES-128-CBC 加密
 │   ├── permissions.ts      # 权限系统（全局 + 按连接）
 │   ├── mysql.ts            # MySQL 连接和查询执行（mysql2）
