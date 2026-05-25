@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
+import { getConnectionInfoFromTools } from "../dbeaver.js";
 import { getDefaultConnectParams } from "../index.js";
 import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
@@ -14,34 +15,6 @@ import { redisConnect } from "../redis.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
-}
-
-/**
- * Get connection info - tries DBeaver first, falls back to CLI default params
- */
-function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
-  try {
-    const info = dbeaver.getConnectionInfo(nameOrId);
-    if (info) {
-      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
-      if (!info.password) {
-        const defaultParams = getDefaultConnectParams();
-        if (defaultParams?.password) {
-          // DBeaver connection found but no password — use CLI password from defaultParams
-          return dbeaver.buildConnectionInfo(defaultParams);
-        }
-      }
-      return info;
-    }
-  } catch {
-    // DBeaver workspace not found, fall through to CLI default params
-  }
-
-  const defaultParams = getDefaultConnectParams();
-  if (defaultParams) {
-    return dbeaver.buildConnectionInfo(defaultParams);
-  }
-  return null;
 }
 
 /**
@@ -59,7 +32,6 @@ async function testConnectionByDriver(
     if (driver === "redis") {
       const redis = await redisConnect(info as any);
       version = await redis.ping();
-      redis.disconnect(true);
       return { success: true, version: `Redis ${version}` };
     }
 
@@ -136,7 +108,7 @@ export function registerConnectionTools(server: McpServer): void {
     { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
-        const info = getConnectionInfo(name);
+        const info = getConnectionInfoFromTools(name);
         if (!info) return text({ error: `Connection '${name}' not found.` });
         const { password: _, ...safe } = info;
         return text(safe);
@@ -207,7 +179,7 @@ export function registerConnectionTools(server: McpServer): void {
     { name: z.string().describe("Connection name or ID") },
     async ({ name }) => {
       try {
-        const info = getConnectionInfo(name);
+        const info = getConnectionInfoFromTools(name);
         if (!info) return text({ success: false, error: `Connection '${name}' not found.` });
         const permError = checkPermission(name, "SELECT 1");
         if (permError) return text({ success: false, error: permError });

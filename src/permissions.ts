@@ -9,6 +9,14 @@ import * as os from "node:os";
 
 const SETTINGS_PATH = path.join(os.homedir(), ".dbeaver-mcp", "settings.json");
 
+// 权限设置缓存
+interface SettingsCache {
+  data: PermissionsConfig;
+  timestamp: number;
+}
+let settingsCache: SettingsCache | null = null;
+const CACHE_TTL_MS = 60_000; // 60 秒缓存
+
 export const RECOGNIZED_OPERATIONS = new Set([
   "SELECT", "SHOW", "EXPLAIN", "DESCRIBE",
   "INSERT", "UPDATE", "DELETE",
@@ -42,11 +50,25 @@ interface PermissionsConfig {
 }
 
 function loadSettings(): PermissionsConfig {
+  // 检查缓存是否有效
+  if (settingsCache && Date.now() - settingsCache.timestamp < CACHE_TTL_MS) {
+    return settingsCache.data;
+  }
+
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
+    const data = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
+    settingsCache = { data, timestamp: Date.now() };
+    return data;
   } catch {
     return {};
   }
+}
+
+/**
+ * 清除权限缓存（强制重新读取设置文件）
+ */
+export function clearPermissionCache(): void {
+  settingsCache = null;
 }
 
 export function extractSqlKeyword(sql: string): string {

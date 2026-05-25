@@ -92,6 +92,7 @@
 ```bash
 git clone https://github.com/ALinCheung/dbeaver-mcp.git ~/.claude/skills/dbeaver-mcp
 cd ~/.claude/skills/dbeaver-mcp
+npm cache clean --force
 npm install && npm run build
 npm link
 ```

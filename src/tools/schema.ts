@@ -5,7 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
-import { getDefaultConnectParams } from "../index.js";
+import { getConnectionInfoFromTools } from "../dbeaver.js";
 import { checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery } from "../mysql.js";
 import { runPostgresQuery } from "../postgres.js";
@@ -14,33 +14,6 @@ import { getRedisSchema, RedisConnectionInfo } from "../redis.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
-}
-
-/**
- * Get connection info - tries DBeaver first, falls back to CLI default params
- */
-function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
-  try {
-    const info = dbeaver.getConnectionInfo(nameOrId);
-    if (info) {
-      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
-      if (!info.password) {
-        const defaultParams = getDefaultConnectParams();
-        if (defaultParams?.password) {
-          return dbeaver.buildConnectionInfo(defaultParams);
-        }
-      }
-      return info;
-    }
-  } catch {
-    // DBeaver workspace not found, fall through to CLI default params
-  }
-
-  const defaultParams = getDefaultConnectParams();
-  if (defaultParams) {
-    return dbeaver.buildConnectionInfo(defaultParams);
-  }
-  return null;
 }
 
 /**
@@ -75,7 +48,7 @@ export function registerSchemaTools(server: McpServer): void {
     },
     async ({ connection, database }) => {
       try {
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SHOW TABLES");
         if (permError) return text({ error: permError });
@@ -143,7 +116,7 @@ export function registerSchemaTools(server: McpServer): void {
     },
     async ({ connection, table, database }) => {
       try {
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "DESCRIBE");
         if (permError) return text({ error: permError });
@@ -277,7 +250,7 @@ export function registerSchemaTools(server: McpServer): void {
     },
     async ({ connection, sql }) => {
       try {
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "EXPLAIN x");
         if (permError) return text({ error: permError });
@@ -337,7 +310,7 @@ export function registerSchemaTools(server: McpServer): void {
     },
     async ({ connection }) => {
       try {
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SHOW PROCESSLIST");
         if (permError) return text({ error: permError });
@@ -384,7 +357,7 @@ export function registerSchemaTools(server: McpServer): void {
     },
     async ({ connection, limit }) => {
       try {
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
         const permError = checkPermission(connection, "SELECT FROM performance_schema");
         if (permError) return text({ error: permError });

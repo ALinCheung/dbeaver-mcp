@@ -49,6 +49,17 @@ export interface ForeignKeyInfo {
   referencedColumns: string[];
 }
 
+// PostgreSQL Pool 缓存（按连接参数 hash）
+const poolCache = new Map<string, pg.Pool>();
+const MAX_POOL_CACHE_SIZE = 10;
+
+/**
+ * 根据连接参数生成 Pool 缓存 key
+ */
+function getPoolCacheKey(info: FullConnectionInfo): string {
+  return `${info.host}:${info.port}:${info.database}:${info.user}`;
+}
+
 /**
  * 检测是否为连接断开类错误
  */
@@ -73,24 +84,53 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * 创建 PostgreSQL 连接池
+ * 获取或创建 PostgreSQL 连接池（带缓存）
  */
-function createPool(info: FullConnectionInfo): pg.Pool {
-  return new Pool({
-    host: info.host,
-    port: parseInt(info.port, 10) || 5432,
-    user: info.user || undefined,
-    password: info.password || undefined,
-    database: info.database || undefined,
-    max: 3,
-    idleTimeoutMillis: 60000,
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 30000,
-  });
+function getPool(info: FullConnectionInfo): pg.Pool {
+  const key = getPoolCacheKey(info);
+
+  if (!poolCache.has(key)) {
+    // 如果缓存已满，清理最旧的 Pool
+    if (poolCache.size >= MAX_POOL_CACHE_SIZE) {
+      const firstKey = poolCache.keys().next().value;
+      if (firstKey) {
+        const oldPool = poolCache.get(firstKey);
+        if (oldPool) {
+          oldPool.end().catch(() => {});
+        }
+        poolCache.delete(firstKey);
+      }
+    }
+
+    const pool = new Pool({
+      host: info.host,
+      port: parseInt(info.port, 10) || 5432,
+      user: info.user || undefined,
+      password: info.password || undefined,
+      database: info.database || undefined,
+      max: 3,
+      idleTimeoutMillis: 60000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 30000,
+    });
+    poolCache.set(key, pool);
+  }
+
+  return poolCache.get(key)!;
+}
+
+/**
+ * 清除 Pool 缓存
+ */
+export function clearPoolCache(): void {
+  for (const pool of poolCache.values()) {
+    pool.end().catch(() => {});
+  }
+  poolCache.clear();
 }
 
 export async function postgresConnect(info: FullConnectionInfo): Promise<pg.Pool> {
-  const pool = createPool(info);
+  const pool = getPool(info);
   await pool.query("SELECT 1");
   return pool;
 }
@@ -100,34 +140,24 @@ export async function runPostgresQuery(
   sql: string,
   params?: any[]
 ): Promise<QueryResult> {
-  const pool = createPool(info);
-  try {
-    return await withRetry(async () => {
-      const result = await pool.query(sql, params);
-      const columns = result.fields ? result.fields.map((f) => f.name) : [];
-      const rows = Array.isArray(result.rows) ? result.rows : [];
-      return { columns, rows, rowcount: rows.length };
-    });
-  } finally {
-    await pool.end();
-  }
+  const pool = getPool(info);
+  const result = await withRetry(async () => pool.query(sql, params));
+  const columns = result.fields ? result.fields.map((f) => f.name) : [];
+  const rows = Array.isArray(result.rows) ? result.rows : [];
+  return { columns, rows, rowcount: rows.length };
 }
 
 export async function runPostgresWrite(
   info: FullConnectionInfo,
   sql: string
 ): Promise<WriteResult> {
-  const pool = createPool(info);
-  try {
-    const result = await pool.query(sql);
-    await pool.query("COMMIT");
-    return {
-      rowcount: result.rowCount || 0,
-      lastrowid: null,
-    };
-  } finally {
-    await pool.end();
-  }
+  const pool = getPool(info);
+  const result = await pool.query(sql);
+  await pool.query("COMMIT");
+  return {
+    rowcount: result.rowCount || 0,
+    lastrowid: null,
+  };
 }
 
 /**
@@ -137,12 +167,8 @@ export async function getPostgresSchema(info: FullConnectionInfo): Promise<{
   databaseName: string;
   tables: TableInfo[];
 }> {
-  const pool = createPool(info);
-  try {
-    return await withRetry(async () => _getPostgresSchemaImpl(pool, info));
-  } finally {
-    await pool.end();
-  }
+  const pool = getPool(info);
+  return await withRetry(async () => _getPostgresSchemaImpl(pool, info));
 }
 
 async function _getPostgresSchemaImpl(

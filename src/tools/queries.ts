@@ -5,7 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as dbeaver from "../dbeaver.js";
-import { getDefaultConnectParams } from "../index.js";
+import { getConnectionInfoFromTools } from "../dbeaver.js";
 import { extractSqlKeyword, checkPermission } from "../permissions.js";
 import { runQuery as runMysqlQuery, runWrite as runMysqlWrite } from "../mysql.js";
 import { runPostgresQuery, runPostgresWrite, isPostgresWriteOperation } from "../postgres.js";
@@ -18,34 +18,6 @@ const WRITE_KEYWORDS = new Set([
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
-}
-
-/**
- * Get connection info - tries DBeaver first, falls back to CLI default params
- */
-function getConnectionInfo(nameOrId: string): dbeaver.FullConnectionInfo | null {
-  try {
-    const info = dbeaver.getConnectionInfo(nameOrId);
-    if (info) {
-      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
-      if (!info.password) {
-        const defaultParams = getDefaultConnectParams();
-        if (defaultParams?.password) {
-          return dbeaver.buildConnectionInfo(defaultParams);
-        }
-      }
-      return info;
-    }
-  } catch {
-    // DBeaver workspace not found, fall through to CLI default params
-  }
-
-  // Fall back to CLI default params
-  const defaultParams = getDefaultConnectParams();
-  if (defaultParams) {
-    return dbeaver.buildConnectionInfo(defaultParams);
-  }
-  return null;
 }
 
 /**
@@ -131,7 +103,7 @@ export function registerQueryTools(server: McpServer): void {
         const permError = checkPermission(connection, trimmed);
         if (permError) return text({ error: permError });
 
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
 
         if (isWriteOperation(info.driver, trimmed)) {
@@ -168,7 +140,7 @@ export function registerQueryTools(server: McpServer): void {
           });
         }
 
-        const info = getConnectionInfo(connection);
+        const info = getConnectionInfoFromTools(connection);
         if (!info) return text({ error: `Connection '${connection}' not found.` });
 
         const result = await executeWrite(info, trimmed);

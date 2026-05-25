@@ -52,8 +52,13 @@ export const DRIVER_DEFAULT_PORTS: Record<string, number> = {
 export function buildConnectionInfo(params: ConnectParams): FullConnectionInfo {
   const driver = params.driver || "mysql8";
   const port = params.port || DRIVER_DEFAULT_PORTS[driver] || 3306;
+
+  // 生成确定性 ID（基于参数 hash）
+  const idStr = `${driver}|${params.host}|${port}|${params.database}|${params.username}`;
+  const idHash = crypto.createHash("sha256").update(idStr).digest("hex").slice(0, 8);
+
   return {
-    id: `direct-${driver}-${Date.now()}`,
+    id: `direct-${driver}-${idHash}`,
     name: params.name || `direct:${params.host}:${port}/${params.database}`,
     driver,
     host: params.host,
@@ -204,6 +209,40 @@ function findId(nameOrId: string, datasources: Record<string, any>): string | nu
   // Fuzzy: substring match (case-insensitive)
   for (const [cid, c] of Object.entries(datasources)) {
     if ((c.name || "").toLowerCase().includes(nameOrId.toLowerCase())) return cid;
+  }
+  return null;
+}
+
+/**
+ * 工具函数：从 index.js 获取默认连接参数
+ */
+import { getDefaultConnectParams } from "./index.js";
+
+/**
+ * Get connection info - tries DBeaver first, falls back to CLI default params
+ * 公共函数，供 tools 文件复用
+ */
+export function getConnectionInfoFromTools(nameOrId: string): FullConnectionInfo | null {
+  try {
+    const info = getConnectionInfo(nameOrId);
+    if (info) {
+      // If DBeaver has the connection but password is empty, and we have CLI default params, use CLI password
+      if (!info.password) {
+        const defaultParams = getDefaultConnectParams();
+        if (defaultParams?.password) {
+          return buildConnectionInfo(defaultParams);
+        }
+      }
+      return info;
+    }
+  } catch {
+    // DBeaver workspace not found, fall through to CLI default params
+  }
+
+  // Fall back to CLI default params
+  const defaultParams = getDefaultConnectParams();
+  if (defaultParams) {
+    return buildConnectionInfo(defaultParams);
   }
   return null;
 }
